@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "title": "APM 1 - 분산추적 기초",
+    "version": "1.1.0",
+    "default_time": 35,
+    "tags": ["apm", "observability", "tracing", "opentelemetry"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "분산 추적에서 '스팬(span)'이 나타내는 것은?",
+      "choices": [
+        "이름이 붙은 단일 작업 구간",
+        "한 서비스의 전체 수명주기",
+        "HTTP 요청 한 건의 본문",
+        "구조화된 로그 메시지 한 줄"
+      ],
+      "answer": 0,
+      "explanation": "스팬은 이름·시작/종료 시각·속성을 가진 하나의 명명된 작업 단위다. 트레이스는 여러 스팬의 부모-자식 관계로 구성된다."
+    },
+    {
+      "type": "mcq",
+      "q": "OpenTelemetry에서 trace_id와 span_id의 비트 길이로 올바른 것은?",
+      "choices": [
+        "trace_id·span_id 모두 64비트",
+        "trace_id 128비트, span_id 64비트",
+        "trace_id 64비트, span_id 128비트",
+        "trace_id·span_id 모두 128비트"
+      ],
+      "answer": 1,
+      "explanation": "trace_id는 128비트(16바이트), span_id는 64비트(8바이트)다. traceparent 헤더에서는 각각 32, 16개의 16진수 문자로 인코딩된다."
+    },
+    {
+      "type": "mcq",
+      "q": "W3C traceparent 헤더에서 trace-flags 값 01이 의미하는 것은?",
+      "choices": [
+        "오류가 발생했음을 의미",
+        "루트 스팬임을 의미",
+        "이 트레이스가 샘플링(수집)됨",
+        "버전이 1임을 의미"
+      ],
+      "answer": 2,
+      "explanation": "trace-flags는 8비트이며 version 00에서 표준화된 비트는 최하위 비트(sampled)뿐이다. 01=샘플링됨, 00=샘플링 안 됨."
+    },
+    {
+      "type": "mcq",
+      "q": "traceparent 헤더의 4개 필드를 순서대로 올바르게 나열한 것은?",
+      "choices": [
+        "trace-id · version · flags · parent-id",
+        "version · flags · trace-id · parent-id",
+        "parent-id · trace-id · version · flags",
+        "version · trace-id · parent-id · flags"
+      ],
+      "answer": 3,
+      "explanation": "예: 00-5b8aa5a2d2c872e8321cf37308d69df2-051581bf3cb55c13-01. version(1바이트), trace-id(32hex), parent-id(16hex), trace-flags(2hex)."
+    },
+    {
+      "type": "ox",
+      "q": "한 트레이스의 루트 스팬은 부모로부터 trace_id를 물려받아 그대로 사용한다.",
+      "answer": false,
+      "explanation": "틀렸다. 루트 스팬은 부모가 없고(parent_span_id 비어 있음) 새 trace_id를 생성한다. trace_id를 상속하는 것은 자식 스팬이다."
+    },
+    {
+      "type": "mcq",
+      "q": "OpenTelemetry SpanKind 중 동기적 '인바운드'(요청을 받는 서버 측) 스팬을 나타내는 것은?",
+      "choices": [
+        "SERVER",
+        "CLIENT",
+        "PRODUCER",
+        "INTERNAL"
+      ],
+      "answer": 0,
+      "explanation": "SERVER=동기 인바운드, CLIENT=동기 아웃바운드, PRODUCER/CONSUMER=비동기 메시징, INTERNAL=서비스 내부 작업."
+    },
+    {
+      "type": "mcq",
+      "q": "스팬의 Status 값으로 정의된 세 가지는?",
+      "choices": [
+        "PENDING, DONE, FAILED",
+        "UNSET, OK, ERROR",
+        "INFO, WARN, ERROR",
+        "OPEN, CLOSED, ABORTED"
+      ],
+      "answer": 1,
+      "explanation": "스팬 Status는 UNSET(기본), OK, ERROR 셋이다. message 필드는 ERROR일 때만 사용한다."
+    },
+    {
+      "type": "mcq",
+      "q": "스팬 '이벤트(event)'와 '자식 스팬'의 핵심 차이는?",
+      "choices": [
+        "이벤트는 다른 트레이스에 속한다",
+        "자식 스팬은 속성을 가질 수 없다",
+        "이벤트는 순간 표시점, 자식 스팬은 구간",
+        "이벤트는 항상 오류를 의미한다"
+      ],
+      "answer": 2,
+      "explanation": "이벤트는 (시각, 이름, 속성) 튜플로 순간적 체크포인트(예외 등)를 표시한다. 지속시간이 필요한 하위 작업은 자식 스팬으로 만든다."
+    },
+    {
+      "type": "mcq",
+      "q": "서로 다른(또는 같은) 트레이스의 스팬 간 인과관계를 부모-자식이 아닌 방식으로 연결하는 개념은?",
+      "choices": [
+        "Tag",
+        "Baggage",
+        "Resource",
+        "Link"
+      ],
+      "answer": 3,
+      "explanation": "Link는 다른 SpanContext를 참조해 인과관계를 만든다. scatter/gather(여러 입력을 모으는) 패턴이나 배치 처리에 쓰인다."
+    },
+    {
+      "type": "ox",
+      "q": "트레이스는 엄밀히 말하면 스팬들이 부모-자식과 링크로 연결된 방향성 비순환 그래프(DAG)로 볼 수 있다.",
+      "answer": true,
+      "explanation": "보통 트리로 그려지지만 링크 때문에 한 스팬이 여러 스팬을 가리킬 수 있어 일반적으로는 DAG다."
+    },
+    {
+      "type": "mcq",
+      "q": "추출된 컨텍스트(외부에서 전파된 부모)로 스팬을 만들 때 부모 SpanContext에 설정되는 플래그는?",
+      "choices": [
+        "IsRemote = true",
+        "IsRoot = true",
+        "IsError = true",
+        "IsSampled = false"
+      ],
+      "answer": 0,
+      "explanation": "프로세스 경계를 넘어 추출된 부모 컨텍스트는 IsRemote=true로 표시되어 외부에서 들어온 부하임을 알린다."
+    },
+    {
+      "type": "mcq",
+      "q": "스팬 속성에 http.method, db.statement 같은 표준 키 이름을 부여하는 OpenTelemetry 규약은?",
+      "choices": [
+        "Propagators",
+        "Semantic Conventions",
+        "Span Processors",
+        "Trace Flags"
+      ],
+      "answer": 1,
+      "explanation": "시맨틱 컨벤션이 속성 키 이름을 표준화해 백엔드가 일관되게 인덱싱·필터링할 수 있게 한다."
+    }
+  ]
+}

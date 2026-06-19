@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "title": "RUM 2 - Core Web Vitals·성능 API",
+    "version": "1.1.0",
+    "default_time": 35,
+    "tags": ["rum", "web-vitals", "performance", "frontend"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "Largest Contentful Paint(LCP)의 'good' 임계값(p75 기준)은?",
+      "choices": [
+        "2.5초 이하",
+        "1.0초 이하",
+        "4.0초 이하",
+        "100ms 이하"
+      ],
+      "answer": 0,
+      "explanation": "LCP good은 2.5초 이하, poor는 4.0초 초과(2.5~4.0초는 needs improvement). 필드 데이터의 75 백분위로 판정한다."
+    },
+    {
+      "type": "mcq",
+      "q": "2024년 3월에 Core Web Vital에서 FID를 대체한 지표는?",
+      "choices": [
+        "TTFB",
+        "INP",
+        "FCP",
+        "TBT"
+      ],
+      "answer": 1,
+      "explanation": "2024-03-12 INP(Interaction to Next Paint)가 정식 Core Web Vital이 되며 FID를 대체했다. FID는 첫 입력 지연만, INP는 페이지 수명 전체의 모든 상호작용을 측정한다."
+    },
+    {
+      "type": "mcq",
+      "q": "INP의 'good' 임계값(p75)은?",
+      "choices": [
+        "100ms 이하",
+        "2.5초 이하",
+        "200ms 이하",
+        "500ms 이하"
+      ],
+      "answer": 2,
+      "explanation": "INP good은 200ms 이하, poor는 500ms 초과. FID(100ms)보다 어려운데, 입력 지연+이벤트 처리+다음 프레임 표시까지 포함하기 때문이다."
+    },
+    {
+      "type": "mcq",
+      "q": "INP 한 건의 지연을 구성하는 세 요소로 옳은 것은?",
+      "choices": [
+        "DNS + TCP + TLS",
+        "fetch + parse + paint",
+        "queue + compute + flush",
+        "input delay + processing + presentation"
+      ],
+      "answer": 3,
+      "explanation": "INP는 입력 지연 + 이벤트 핸들러 실행 시간 + 다음 프레임 표시 지연의 합이다. Event Timing API의 'event' 엔트리에서 읽는다."
+    },
+    {
+      "type": "mcq",
+      "q": "Cumulative Layout Shift(CLS)의 'good' 임계값은?",
+      "choices": [
+        "0.1 이하 (무단위 비율)",
+        "100ms 이하",
+        "2.5 이하",
+        "0.5초 이하"
+      ],
+      "answer": 0,
+      "explanation": "CLS good은 0.1 이하, poor는 0.25 초과. 시간이 아니라 단위 없는 레이아웃 이동 점수이며 세션 윈도우 중 최대값을 보고한다."
+    },
+    {
+      "type": "mcq",
+      "q": "개별 레이아웃 이동 점수의 계산식은?",
+      "choices": [
+        "viewport width × height",
+        "impact fraction × distance fraction",
+        "p99 latency / p50 latency",
+        "transferSize / duration"
+      ],
+      "answer": 1,
+      "explanation": "이동 점수 = 영향 영역 비율(impact fraction) × 이동 거리 비율(distance fraction)."
+    },
+    {
+      "type": "mcq",
+      "q": "Web Vitals 수집의 표준 API로, buffered:true로 옵저버 생성 전 기록된 엔트리도 받을 수 있는 것은?",
+      "choices": [
+        "MutationObserver",
+        "IntersectionObserver",
+        "PerformanceObserver",
+        "ResizeObserver"
+      ],
+      "answer": 2,
+      "explanation": "PerformanceObserver가 성능 엔트리를 비동기로 받는다. buffered:true는 옵저버 부착 전 기록(특히 LCP)도 가져오는 데 필수다."
+    },
+    {
+      "type": "mcq",
+      "q": "LCP를 관측할 때 PerformanceObserver가 지정하는 entryType은?",
+      "choices": [
+        "layout-shift",
+        "event",
+        "navigation",
+        "largest-contentful-paint"
+      ],
+      "answer": 3,
+      "explanation": "LCP는 'largest-contentful-paint' 엔트리로 관측하며, 사용자 스크롤/입력 후 측정이 멈추고 마지막 유효 엔트리의 startTime이 값이 된다."
+    },
+    {
+      "type": "ox",
+      "q": "layout-shift 엔트리에서 hadRecentInput 플래그가 true인 이동(사용자 입력 직후 발생)은 CLS 계산에서 제외된다.",
+      "answer": true,
+      "explanation": "사용자 입력 직후 의도된 이동은 hadRecentInput=true로 표시되어 CLS에서 제외한다."
+    },
+    {
+      "type": "mcq",
+      "q": "TTFB(Time to First Byte)를 Navigation Timing 값으로 계산하는 식으로 옳은 것은?",
+      "choices": [
+        "responseStart - startTime",
+        "loadEventEnd - domComplete",
+        "connectEnd - connectStart",
+        "responseEnd - responseStart"
+      ],
+      "answer": 0,
+      "explanation": "TTFB = responseStart - startTime(fetchStart 기준). good 기준은 약 800ms 이하다."
+    },
+    {
+      "type": "mcq",
+      "q": "개별 네트워크 자원의 fetchStart·connectStart·responseEnd 등 세부 타이밍을 제공하는 API(entryType 'resource')는?",
+      "choices": [
+        "Navigation Timing API",
+        "Resource Timing API",
+        "Paint Timing API",
+        "Long Tasks API"
+      ],
+      "answer": 1,
+      "explanation": "Resource Timing API(PerformanceResourceTiming, entryType 'resource')가 자원별 네트워크 타이밍을 제공해 네트워크 대 렌더링 병목을 구분하게 해준다."
+    },
+    {
+      "type": "ox",
+      "q": "First Contentful Paint(FCP)는 LCP·INP·CLS와 동급의 핵심 Core Web Vital이다.",
+      "answer": false,
+      "explanation": "틀렸다. 2026년 핵심 Core Web Vitals는 LCP·INP·CLS 셋이다. FCP는 보조(diagnostic) 지표로, 'paint' 엔트리의 first-contentful-paint로 측정하며 good은 약 1.8초 이하다."
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "meta": {
+    "title": "APM 2 - OTel 계측·Collector·전파",
+    "version": "1.1.0",
+    "default_time": 35,
+    "tags": ["apm", "observability", "opentelemetry", "collector"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "OpenTelemetry Collector 파이프라인의 데이터 흐름 순서로 올바른 것은?",
+      "choices": [
+        "Receivers → Processors → Exporters",
+        "Exporters → Processors → Receivers",
+        "Processors → Receivers → Exporters",
+        "Receivers → Exporters → Processors"
+      ],
+      "answer": 0,
+      "explanation": "리시버가 데이터를 수신하고, (선택적) 프로세서가 변환/필터/샘플링하고, 익스포터가 백엔드로 내보낸다."
+    },
+    {
+      "type": "mcq",
+      "q": "Collector에서 프로세서(processor)의 역할에 해당하지 않는 것은?",
+      "choices": [
+        "데이터 변환(속성 수정 등)",
+        "포트를 열어 데이터를 수신",
+        "필터링·배치 처리",
+        "테일 기반 샘플링"
+      ],
+      "answer": 1,
+      "explanation": "포트를 열어 수신하는 것은 리시버의 역할이다. 프로세서는 파이프라인 중간에서 변환·필터·배치·샘플링을 한다."
+    },
+    {
+      "type": "ox",
+      "q": "Collector 파이프라인에서 프로세서는 정의된 순서대로 순차 적용되므로 순서가 동작 결과에 영향을 준다.",
+      "answer": true,
+      "explanation": "프로세서는 앞에서 받아 뒤로 넘기는 순차 구조라 배치·샘플링·속성수정의 순서가 결과를 바꾼다."
+    },
+    {
+      "type": "mcq",
+      "q": "프로세스 경계를 넘어 컨텍스트를 직렬화(inject)/역직렬화(extract)하는 OpenTelemetry 구성요소는?",
+      "choices": [
+        "Exporter",
+        "Sampler",
+        "Propagator",
+        "Resource"
+      ],
+      "answer": 2,
+      "explanation": "Propagator가 HTTP 헤더 등 carrier에 컨텍스트를 주입/추출한다. 기본값은 W3C Trace Context Propagator."
+    },
+    {
+      "type": "mcq",
+      "q": "자동 계측(auto-instrumentation)과 수동 계측의 일반적 트레이드오프로 옳은 것은?",
+      "choices": [
+        "수동이 항상 더 빠르고 정확하다",
+        "자동 계측은 컨텍스트 전파를 못 한다",
+        "수동 계측은 trace_id를 못 만든다",
+        "자동은 무코드, 미지원은 수동 필요"
+      ],
+      "answer": 3,
+      "explanation": "자동 계측은 라이브러리 훅으로 전파를 투명하게 처리한다. 지원되지 않는 라이브러리나 커스텀 흐름은 수동 inject/extract가 필요하다."
+    },
+    {
+      "type": "mcq",
+      "q": "tracestate 헤더의 용도로 올바른 것은?",
+      "choices": [
+        "벤더별 name=value 쌍을 전파",
+        "trace_id를 암호화한다",
+        "스팬의 지속시간을 저장한다",
+        "샘플링 비율을 강제한다"
+      ],
+      "answer": 0,
+      "explanation": "tracestate는 vendorname=value 형식의 벤더별 정보를 운반한다. traceparent를 대체하지 않고 보완한다."
+    },
+    {
+      "type": "ox",
+      "q": "SpanContext는 trace_id, span_id, trace_flags, trace_state를 담은 불변(immutable) 객체이며 프로세스 경계를 넘어 전파되어야 한다.",
+      "answer": true,
+      "explanation": "SpanContext는 불변·직렬화 가능 객체로, 자식 스팬과 프로세스 경계 너머로 반드시 전파되어야 한다."
+    },
+    {
+      "type": "mcq",
+      "q": "OTLP(OpenTelemetry Protocol)에 대한 설명으로 옳은 것은?",
+      "choices": [
+        "트레이스를 저장하는 데이터베이스",
+        "텔레메트리 전송용 표준 프로토콜",
+        "브라우저 성능 측정 API",
+        "샘플링 알고리즘의 한 종류"
+      ],
+      "answer": 1,
+      "explanation": "OTLP는 SDK→Collector→백엔드 간 trace/metric/log를 실어 나르는 표준 와이어 프로토콜이다(gRPC 또는 HTTP)."
+    },
+    {
+      "type": "mcq",
+      "q": "하나의 Collector 리시버가 여러 파이프라인에 데이터를 공급할 수 있는 이유로 맞는 것은?",
+      "choices": [
+        "리시버는 파이프라인당 하나만 가능",
+        "익스포터는 데이터를 수신만 한다",
+        "모듈식이라 조합·공유가 가능",
+        "프로세서가 리시버를 생성한다"
+      ],
+      "answer": 2,
+      "explanation": "Collector는 모듈식 파이프라인이라 같은 리시버가 여러 파이프라인에 공급하고, 여러 파이프라인이 익스포터를 공유할 수 있다."
+    },
+    {
+      "type": "mcq",
+      "q": "온프레미스 추적 백엔드를 직접 구축할 때 OTLP로 계측하면 얻는 이점은?",
+      "choices": [
+        "샘플링이 불필요해진다",
+        "trace_id 길이가 절반이 된다",
+        "브라우저에서도 자동 동작한다",
+        "벤더 비종속으로 백엔드 교체 자유"
+      ],
+      "answer": 3,
+      "explanation": "OTLP 표준 계측은 벤더 중립적이라 Collector·저장 백엔드(Jaeger/Tempo 등)를 온프레 환경에서 자유롭게 선택·교체할 수 있다."
+    },
+    {
+      "type": "ox",
+      "q": "tracestate가 존재하고 전파 중 변경되지 않았다면 traceparent도 변경되지 않아야 한다.",
+      "answer": false,
+      "explanation": "역방향이라 틀렸다. W3C 규칙은 'traceparent를 변경하지 않았으면 tracestate도 변경하지 않는다'는 한 방향뿐이다. tracestate가 그대로여도 각 참가자는 parent-id 갱신·sampled 플래그 변경으로 traceparent를 독립적으로 바꿀 수 있다."
+    },
+    {
+      "type": "mcq",
+      "q": "Collector를 앱과 같은 호스트에 두는 'agent' 모드 대비 별도 중앙 'gateway' 모드의 주요 이점은?",
+      "choices": [
+        "중앙에서 테일 샘플링·배치·라우팅",
+        "trace_id 생성을 대신해 준다",
+        "브라우저 계측이 불필요해진다",
+        "스팬을 자동으로 생성해 준다"
+      ],
+      "answer": 0,
+      "explanation": "gateway 모드는 트래픽을 모아 테일 기반 샘플링·배치·라우팅 같은 무거운 처리를 중앙에서 수행하기 좋다."
+    }
+  ]
+}

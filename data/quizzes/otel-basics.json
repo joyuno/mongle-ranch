@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "title": "OpenTelemetry Basics",
+    "version": "0.1.0",
+    "default_time": 25,
+    "set_time": 480,
+    "tags": [
+      "opentelemetry",
+      "observability",
+      "oss"
+    ]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "OpenTelemetry가 표준화하는 텔레메트리 신호 3종은?",
+      "choices": [
+        "traces, logs, events",
+        "profiles, traces, errors",
+        "metrics, traces, logs",
+        "alerts, dashboards, traces"
+      ],
+      "answer": 2,
+      "explanation": "OTel은 traces·metrics·logs 세 신호를 공통 데이터 모델·SDK·collector로 묶는다.\nprofiles는 OTel 1.36(2024) 이후 추가 신호로 발전 중.\n",
+      "tags": [
+        "signals"
+      ],
+      "glossary": [
+        "텔레메트리｜｜시스템이 내보내는 동작 관측 데이터",
+        "SDK｜｜계측 코드를 만드는 개발 도구 모음",
+        "collector｜｜텔레메트리를 받아 가공·전달하는 중계 컴포넌트"
+      ]
+    },
+    {
+      "type": "ox",
+      "q": "OTel SDK는 vendor lock-in을 강제한다.",
+      "answer": false,
+      "explanation": "OTel은 vendor-neutral 표준. exporter만 바꾸면 백엔드 교체 가능.\n",
+      "tags": [
+        "philosophy"
+      ],
+      "glossary": [
+        "vendor lock-in｜｜특정 공급사에 종속되어 교체가 어려운 상태",
+        "exporter｜｜수집 데이터를 백엔드로 내보내는 모듈",
+        "vendor-neutral｜｜특정 공급사에 묶이지 않은 중립 표준"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "OTLP가 의미하는 것은?",
+      "choices": [
+        "OpenTelemetry Logging Protocol",
+        "OpenTelemetry Protocol (전송 규격)",
+        "Observability Telemetry Layer Protocol",
+        "Open Tracing Library Protocol"
+      ],
+      "answer": 1,
+      "explanation": "gRPC 또는 HTTP/Protobuf로 collector·백엔드에 데이터를 전송하는 표준 와이어 포맷.",
+      "tags": [
+        "otlp"
+      ],
+      "glossary": [
+        "gRPC｜｜HTTP/2 기반 고성능 RPC 통신 프레임워크",
+        "Protobuf｜｜구글의 이진 직렬화 데이터 포맷",
+        "collector｜｜텔레메트리를 받아 전달하는 중계 컴포넌트"
+      ]
+    },
+    {
+      "type": "ox",
+      "q": "span은 trace의 부분 단위이며 parent span을 가질 수 있다.",
+      "answer": true,
+      "explanation": "trace는 여러 span의 DAG. 각 span은 부모 span 컨텍스트를 참조해 분산 호출을 잇는다.",
+      "tags": [
+        "tracing"
+      ],
+      "glossary": [
+        "trace｜｜요청 하나의 전체 처리 경로 기록",
+        "DAG｜｜순환 없는 방향성 그래프",
+        "분산 호출｜｜여러 서비스에 걸친 요청 호출"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "Histogram metric의 base2 exponential bucket 표현은\n어떤 이점이 있는가?\n",
+      "choices": [
+        "적은 메모리로 넓은 동적 범위",
+        "100% 정확한 quantile",
+        "압축률이 가장 높음",
+        "평균 계산이 빠름"
+      ],
+      "answer": 0,
+      "explanation": "exponential histogram은 적응형 base2 bucket으로 sparse하게 표현해\n넓은 동적 범위에서도 메모리·정확도 트레이드오프가 우수하다.\n",
+      "tags": [
+        "metrics"
+      ],
+      "glossary": [
+        "Histogram｜｜값 분포를 구간별 빈도로 집계하는 지표",
+        "quantile｜｜분포에서 특정 백분위 지점 값",
+        "동적 범위｜｜표현 가능한 최소~최대 값의 폭"
+      ]
+    },
+    {
+      "type": "ox",
+      "q": "OTel collector는 반드시 별도 프로세스로 띄워야 한다.",
+      "answer": false,
+      "explanation": "embedded(SDK 직접 export)도 가능. 다만 fan-out·재시도·민감 데이터 redaction에는\n별도 collector(agent/gateway 패턴)가 권장된다.\n",
+      "tags": [
+        "collector"
+      ],
+      "glossary": [
+        "fan-out｜｜하나의 데이터를 여러 대상에 분배 전송",
+        "redaction｜｜민감 정보를 가리거나 제거하는 처리",
+        "agent/gateway｜｜로컬 수집기와 중앙 게이트웨이 배치 패턴"
+      ]
+    }
+  ]
+}

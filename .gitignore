@@ -1,0 +1,51 @@
+# Godot 4+ specific ignores
+.godot/
+.import/
+
+# Node tooling for asset generation (gen-sprites.mjs + strip-bg.mjs)
+node_modules/
+scripts/package-lock.json
+# Imported translations (automatically generated from CSV files)
+*.translation
+# Mono-specific ignores (we use GDScript but keep these in case)
+.mono/
+data_*/
+mono_crash.*.json
+# System
+.DS_Store
+Thumbs.db
+*.log
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+# Exported builds (large binaries — ship via GitHub Releases, not git)
+exports/
+release/
+*.exe
+*.dmg
+*.apk
+*.pck
+*.zip
+.env
+
+# Asset regeneration backups (kept locally as safety net before model swaps)
+assets/swords/_backup_*/
+
+# Memory and dev workspace — local-only state, not part of the repo
+MEMORY.md
+_workspace/
+.omc/
+tests/debug_*.gd
+tests/debug_*.gd.uid
+
+# Dev verification artifacts (screenshots) — not part of the game
+_shots/
+
+# Internal research / risk docs reference external IP by name (design analysis).
+# Per docs/RISKS.md HIGH rule those names must not appear in a published repo,
+# so these stay LOCAL-ONLY and are excluded from the public repository.
+docs/RESEARCH.md
+docs/RESEARCH_PASS2.md
+docs/RISKS.md
+

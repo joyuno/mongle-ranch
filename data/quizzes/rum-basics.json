@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "title": "RUM 1 - 이벤트 모델·SDK·전송",
+    "version": "1.1.0",
+    "default_time": 35,
+    "tags": ["rum", "observability", "frontend", "browser"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "RUM 이벤트 모델에서 한 사용자 방문 전체를 묶는 최상위 컨테이너 이벤트는?",
+      "choices": [
+        "Session(세션)",
+        "View(뷰)",
+        "Action(액션)",
+        "Resource(리소스)"
+      ],
+      "answer": 0,
+      "explanation": "세션은 한 방문의 모든 RUM 이벤트(뷰·액션·리소스·오류)를 묶는 컨테이너다. 보통 무활동 타임아웃(예: 15~30분)과 최대 지속시간 한도를 둔다."
+    },
+    {
+      "type": "mcq",
+      "q": "SPA에서 라우트(페이지) 전환마다 생성되며, Core Web Vitals의 기준점이 되는 RUM 이벤트는?",
+      "choices": [
+        "Session(세션)",
+        "View(뷰)",
+        "Resource(리소스)",
+        "Long Task"
+      ],
+      "answer": 1,
+      "explanation": "뷰는 페이지 방문/라우트 전환마다 생성되고, 해당 뷰에 속한 리소스·액션·오류와 LCP/INP/CLS가 연결된다."
+    },
+    {
+      "type": "mcq",
+      "q": "XHR/Fetch·이미지·CSS·폰트 등 네트워크 자원의 타이밍을 담는 RUM 이벤트는?",
+      "choices": [
+        "Action(액션)",
+        "Error(오류)",
+        "Resource(리소스)",
+        "Session(세션)"
+      ],
+      "answer": 2,
+      "explanation": "리소스 이벤트는 메서드·URL·상태코드와 Resource Timing API의 transferSize·duration 등 타이밍 필드를 담는다."
+    },
+    {
+      "type": "mcq",
+      "q": "클릭·탭 등 사용자 상호작용을 기록하며 rage click·dead click 같은 'frustration signal'을 가질 수 있는 RUM 이벤트는?",
+      "choices": [
+        "View(뷰)",
+        "Resource(리소스)",
+        "Long Task",
+        "Action(액션)"
+      ],
+      "answer": 3,
+      "explanation": "액션 이벤트는 상호작용을 기록하고 분노 클릭·죽은 클릭·오류 클릭 같은 좌절 신호를 가질 수 있다."
+    },
+    {
+      "type": "mcq",
+      "q": "메인 스레드를 50ms 넘게 막은 작업을 PerformanceObserver의 어떤 entryType으로 감지하는가?",
+      "choices": [
+        "longtask",
+        "navigation",
+        "paint",
+        "resource"
+      ],
+      "answer": 0,
+      "explanation": "50ms 초과로 메인 스레드를 막는 long task는 entryType 'longtask'로 관측되며 INP 지연 진단에 중요하다."
+    },
+    {
+      "type": "mcq",
+      "q": "RUM SDK가 분석 데이터를 보낼 때 쓰는 navigator.sendBeacon()의 특징으로 옳은 것은?",
+      "choices": [
+        "동기 GET이라 언로드를 막는다",
+        "비차단 비동기 POST, hidden에도 전송",
+        "응답 본문을 받아 처리한다",
+        "전송 용량 제한이 전혀 없다"
+      ],
+      "answer": 1,
+      "explanation": "sendBeacon은 비차단 비동기 POST다. 언로드/visibilitychange(hidden) 시점에도 전송을 보장하고 응답은 받지 않는다."
+    },
+    {
+      "type": "ox",
+      "q": "sendBeacon 및 keepalive 요청의 페이로드는 페이지당 약 64KiB(65,536바이트) 한도를 공유한다.",
+      "answer": true,
+      "explanation": "sendBeacon과 fetch keepalive는 페이지당 약 64KiB 한도를 공유한다. 큰 배치는 분할 전송해야 한다."
+    },
+    {
+      "type": "mcq",
+      "q": "커스텀 헤더나 POST 외 메서드가 필요할 때 sendBeacon 대신 쓸 수 있는 전송 방식은?",
+      "choices": [
+        "동기 XMLHttpRequest 사용",
+        "WebSocket 연결만 사용",
+        "fetch(url, {keepalive:true})",
+        "localStorage에 기록"
+      ],
+      "answer": 2,
+      "explanation": "fetch의 keepalive 플래그는 언로드 중에도 요청을 유지한다. sendBeacon과 같은 64KiB 한도를 공유한다."
+    },
+    {
+      "type": "ox",
+      "q": "RUM 비콘 전송은 beforeunload/unload 이벤트에 의존하는 것이 가장 안정적이다.",
+      "answer": false,
+      "explanation": "unload/beforeunload는 신뢰성이 낮고 bfcache(뒤로가기 캐시)를 깬다. visibilitychange의 hidden(보조로 pagehide)에서 보내는 것이 권장된다."
+    },
+    {
+      "type": "mcq",
+      "q": "RUM의 세션 단위 샘플링(session sampling)에 대한 설명으로 옳은 것은?",
+      "choices": [
+        "이벤트마다 매번 새로 추첨한다",
+        "오류 이벤트만 100% 전송한다",
+        "서버가 trace_id로 결정한다",
+        "세션 시작 시 1회로 전체 결정"
+      ],
+      "answer": 3,
+      "explanation": "세션 샘플링은 세션 생성 시 한 번 추첨(0~100 vs sampleRate)해 세션 전체를 수집/폐기한다. 이벤트별 추첨이 아니다."
+    },
+    {
+      "type": "mcq",
+      "q": "수집 전 브라우저에서 각 이벤트를 가로채 URL의 PII 제거나 이벤트 폐기를 할 수 있게 하는 SDK 훅은?",
+      "choices": [
+        "beforeSend 콜백",
+        "afterReceive 콜백",
+        "onError 핸들러만",
+        "service worker fetch"
+      ],
+      "answer": 0,
+      "explanation": "beforeSend(event, context)는 전송 직전 브라우저에서 실행되어 이벤트 수정 또는 false 반환으로 폐기할 수 있다. 마스킹은 전송 전 클라이언트에서 적용된다."
+    },
+    {
+      "type": "mcq",
+      "q": "압축(minify)된 프런트엔드 코드의 오류 스택을 원본 위치로 되돌리려고 빌드 도구가 생성·업로드하는 것은?",
+      "choices": [
+        "TypeScript 정의 파일",
+        "Source Map(version 3 JSON)",
+        ".env 환경 파일",
+        "OTLP 트레이스 파일"
+      ],
+      "answer": 1,
+      "explanation": "Source Map V3(version 3, mappings는 VLQ 인코딩)를 업로드하면 ingestion 시 service·version 태그로 매칭해 스택을 원본 위치로 언미니파이한다."
+    }
+  ]
+}

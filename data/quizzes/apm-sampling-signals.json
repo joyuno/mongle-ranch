@@ -1,0 +1,136 @@
+{
+  "meta": {
+    "title": "APM 3 - 샘플링·지표·저장",
+    "version": "1.1.0",
+    "default_time": 40,
+    "tags": ["apm", "observability", "sampling", "metrics"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "헤드 기반(head-based) 샘플링의 결정 시점은?",
+      "choices": [
+        "루트 스팬에서 하위 스팬 생성 전에 결정",
+        "트레이스가 모두 끝난 뒤에 결정",
+        "백엔드에 저장하기 직전에 결정",
+        "사용자가 페이지를 떠날 때 결정"
+      ],
+      "answer": 0,
+      "explanation": "헤드 기반은 루트에서 미리 결정하고 그 결정을 traceparent로 하위에 전파한다. 상태가 없고 효율적이지만 결과(오류/지연)를 알기 전에 정해야 한다."
+    },
+    {
+      "type": "mcq",
+      "q": "테일 기반(tail-based) 샘플링의 핵심 장점은?",
+      "choices": [
+        "상태 버퍼가 없어 메모리에 가벼움",
+        "결정이 항상 즉시 이뤄져 지연이 없음",
+        "trace_id 라우팅이 필요 없어 단순함",
+        "완성 후 오류·지연 트레이스를 선별 보관"
+      ],
+      "answer": 3,
+      "explanation": "테일 기반은 모든 스팬을 모아 트레이스 전체 맥락(오류 발생, p99 지연)을 보고 결정한다. 대신 상태 저장 버퍼·지연·트레이스 단위 라우팅이 필요하다."
+    },
+    {
+      "type": "ox",
+      "q": "오류율이 0.1%인데 무작위 10% 헤드 샘플링을 하면 오류 트레이스는 약 0.01%만 수집되어 희귀 오류를 놓치기 쉽다.",
+      "answer": true,
+      "explanation": "헤드 샘플링은 결과를 모르고 정하므로 0.1% × 10% = 0.01%만 잡힌다. 그래서 오류 보존엔 테일 샘플링이 유리하다."
+    },
+    {
+      "type": "mcq",
+      "q": "RED 방법이 측정하는 세 가지는?",
+      "choices": [
+        "Reads, Edits, Deletes",
+        "Rate, Errors, Duration",
+        "Resource, Engine, Disk",
+        "Rate, Energy, Density"
+      ],
+      "answer": 1,
+      "explanation": "RED는 서비스 관점 지표다. Rate(요청률)·Errors(오류)·Duration(지연 분포, 백분위수)로 '사용자 입장에서 서비스가 건강한가'를 본다."
+    },
+    {
+      "type": "mcq",
+      "q": "USE 방법이 측정하는 세 가지는?",
+      "choices": [
+        "Utilization, Saturation, Errors",
+        "Usage, Size, Entropy",
+        "Uptime, Speed, Errors",
+        "Users, Sessions, Events"
+      ],
+      "answer": 0,
+      "explanation": "USE는 자원 관점 지표다. Utilization(사용률)·Saturation(포화, 대기 큐)·Errors(오류)로 '어느 자원이 병목인가'를 본다."
+    },
+    {
+      "type": "mcq",
+      "q": "지연(latency) 모니터링에서 평균(average) 대신 백분위수(p95/p99)를 쓰는 이유로 옳은 것은?",
+      "choices": [
+        "백분위수가 계산이 더 빠르기 때문",
+        "평균이 음수가 될 수 있기 때문",
+        "p99가 항상 평균보다 작기 때문",
+        "평균은 느린 소수(꼬리)를 가리기 때문"
+      ],
+      "answer": 3,
+      "explanation": "평균 5ms라도 p99가 500ms이면 1%가 100배 느린 경험을 한다. 평균은 분포의 꼬리(느린 소수 요청)를 숨겨 사용자 체감 악화를 가린다."
+    },
+    {
+      "type": "ox",
+      "q": "여러 인스턴스의 p99 값을 산술 평균하면 클러스터 전체 p99를 얻을 수 있다.",
+      "answer": false,
+      "explanation": "백분위수는 더하거나 평균낼 수 없다. 올바른 방법은 히스토그램(버킷 카운트)을 먼저 합산한 뒤 분위수를 계산하는 것이다."
+    },
+    {
+      "type": "mcq",
+      "q": "N개의 하위 호출을 병렬로 부르는 마이크로서비스에서, 각 호출이 독립적으로 p99(=99%)를 만족할 때 전체가 모두 p99 내에 들 확률은?",
+      "choices": [
+        "항상 99%로 일정하다",
+        "N × 99%가 된다",
+        "0.99^N (N 커지면 급감)",
+        "1.00으로 영향이 없다"
+      ],
+      "answer": 2,
+      "explanation": "팬아웃에서는 0.99^N로 떨어진다. N=50이면 약 60%만 모든 호출이 p99 내에 들어 꼬리 지연이 증폭된다."
+    },
+    {
+      "type": "mcq",
+      "q": "집계된 지표(히스토그램)의 특정 측정점에 trace_id를 붙여 '지표 → 트레이스'로 점프하게 해주는 개념은?",
+      "choices": [
+        "Baggage",
+        "Span Link",
+        "Resource Attribute",
+        "Exemplar"
+      ],
+      "answer": 3,
+      "explanation": "Exemplar는 히스토그램 등 지표 측정에 trace_id를 첨부한다. 그래프의 스파이크에서 클릭해 해당 트레이스로 이동할 수 있다."
+    },
+    {
+      "type": "mcq",
+      "q": "트레이스 저장 백엔드로 Grafana Tempo가 사용하는 저장 방식에 가장 가까운 것은?",
+      "choices": [
+        "단일 관계형 테이블 행으로 저장",
+        "오브젝트 스토리지에 Parquet 컬럼형 저장",
+        "브라우저 localStorage에 저장",
+        "trace_id 없이 로그 파일로만 저장"
+      ],
+      "answer": 1,
+      "explanation": "Tempo는 트레이스를 Parquet 컬럼형 블록으로 오브젝트 스토리지(S3/GCS)에 쓰고, 블룸 필터·인덱스로 trace_id 조회를 효율화한다."
+    },
+    {
+      "type": "ox",
+      "q": "Jaeger의 트레이스 저장 백엔드는 Cassandra 하나뿐이다.",
+      "answer": false,
+      "explanation": "틀렸다. Jaeger는 Elasticsearch/OpenSearch와 Cassandra를 모두 지원한다(메모리 등도). OpenSearch는 다중 필드 인덱싱, Cassandra는 네이티브 TTL이 강점이라 트레이드오프가 있다."
+    },
+    {
+      "type": "mcq",
+      "q": "실무에서 흔한 하이브리드 샘플링 전략은?",
+      "choices": [
+        "샘플링 없이 전체 100%를 저장",
+        "평균 지연만 저장하고 트레이스는 폐기",
+        "헤드로 1차 절감 + 테일로 오류·지연 보존",
+        "브라우저에서만 샘플링하고 서버는 무시"
+      ],
+      "answer": 2,
+      "explanation": "헤드(예: 10%)로 기본 볼륨을 줄이고, Collector의 테일 정책으로 오류·느린 트레이스를 추가 보존하는 조합이 흔하다."
+    }
+  ]
+}

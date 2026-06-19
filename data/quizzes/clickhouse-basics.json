@@ -1,0 +1,229 @@
+{
+  "meta": {
+    "title": "ClickHouse Basics",
+    "version": "0.1.0",
+    "default_time": 30,
+    "set_time": 600,
+    "tags": [
+      "clickhouse",
+      "oss-db",
+      "mvp-sample"
+    ]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "ClickHouse의 MergeTree 엔진이 데이터를 디스크에 저장할 때\npart 내부 정렬에 사용하는 기준은?\n",
+      "choices": [
+        "ORDER BY로 지정된 primary key",
+        "Hash sort",
+        "B+Tree 인덱스",
+        "입력 순서 보존(정렬 없음)"
+      ],
+      "answer": 0,
+      "explanation": "MergeTree는 part 내부를 ORDER BY 절(또는 PRIMARY KEY)에 따라 정렬해\n저장한다. 이 정렬이 sparse primary index의 기반이 된다.\n",
+      "tags": [
+        "mergetree",
+        "indexing"
+      ],
+      "glossary": [
+        "ORDER BY｜｜정렬 기준 컬럼을 지정하는 SQL 절",
+        "primary key｜｜행을 식별·정렬하는 기준 키",
+        "B+Tree｜｜범위 검색에 쓰는 균형 트리 인덱스",
+        "part｜｜MergeTree가 저장하는 데이터 묶음 단위"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "ClickHouse에서 데이터 압축은 어느 단위에서 일어나는가?",
+      "choices": [
+        "row 단위",
+        "table 전체 단위",
+        "database 단위",
+        "column 단위"
+      ],
+      "answer": 3,
+      "explanation": "ClickHouse는 column-oriented 저장. 각 컬럼은 개별 파일로 저장되고\ncolumn 단위로 압축된다 (LZ4 기본).\n",
+      "tags": [
+        "storage",
+        "compression"
+      ],
+      "glossary": [
+        "row 단위｜｜한 행씩 묶어 처리하는 방식",
+        "LZ4｜｜빠른 무손실 압축 알고리즘",
+        "컬럼｜｜표의 세로 한 열, 같은 종류 값 모음"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "대량 INSERT 시 권장되는 방식은?\n",
+      "choices": [
+        "1행씩 INSERT 반복",
+        "UPDATE로 누적",
+        "1000~100,000행 배치 INSERT",
+        "TRUNCATE 후 재삽입"
+      ],
+      "answer": 2,
+      "explanation": "각 INSERT는 새 part를 만들고 백그라운드 merge를 유발한다.\n너무 작은 INSERT가 빈번하면 too many parts 에러로 이어진다.\n",
+      "tags": [
+        "insert",
+        "performance"
+      ],
+      "glossary": [
+        "INSERT｜｜테이블에 새 행을 추가하는 명령",
+        "part｜｜INSERT마다 생기는 데이터 묶음 단위",
+        "merge｜｜작은 part들을 합치는 백그라운드 작업",
+        "TRUNCATE｜｜테이블 전체 행을 비우는 명령"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "ClickHouse에서 동일 PK로 최신 row만 유지하고 싶을 때\n적합한 엔진은?\n",
+      "choices": [
+        "MergeTree",
+        "ReplacingMergeTree",
+        "SummingMergeTree",
+        "AggregatingMergeTree"
+      ],
+      "answer": 1,
+      "explanation": "ReplacingMergeTree는 동일 sorting key에 대해 background merge 시\n중복 row를 제거한다. 단, merge 시점은 비결정적이라 FINAL 사용 또는\n쿼리에서 max(version) 패턴이 필요할 수 있다.\n",
+      "tags": [
+        "engines",
+        "dedup"
+      ],
+      "glossary": [
+        "PK｜｜행을 식별하는 기본 키",
+        "sorting key｜｜part 내부 정렬 기준 컬럼",
+        "SummingMergeTree｜｜동일 키 수치를 합산하는 엔진",
+        "FINAL｜｜중복 제거를 강제하는 쿼리 수식어"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "Materialized View는 ClickHouse에서 언제 갱신되는가?\n",
+      "choices": [
+        "source table에 INSERT가 일어날 때 trigger처럼",
+        "1분 주기 cron",
+        "명시적 REFRESH 명령으로만",
+        "쿼리 시점에 lazy 계산"
+      ],
+      "answer": 0,
+      "explanation": "ClickHouse MV는 source table의 INSERT 시 동일 트랜잭션 내에서\n변환 SQL을 실행해 target table에 기록한다. UPDATE/DELETE는\n반영되지 않는다.\n",
+      "tags": [
+        "materialized-view"
+      ],
+      "glossary": [
+        "source table｜｜MV가 입력을 받아오는 원본 테이블",
+        "trigger｜｜특정 이벤트 시 자동 실행되는 동작",
+        "cron｜｜정해진 주기로 작업을 실행하는 스케줄러",
+        "lazy 계산｜｜필요할 때까지 미루는 지연 계산"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "ClickHouse 쿼리에서 매우 많은 row를 빠르게 스킵하는\n핵심 자료구조는?\n",
+      "choices": [
+        "B+Tree",
+        "LSM tree만으로",
+        "Bloom filter only",
+        "sparse primary index + granule (mark)"
+      ],
+      "answer": 3,
+      "explanation": "ClickHouse는 일반 DBMS와 달리 sparse primary index를 사용한다.\nindex_granularity(기본 8192)마다 mark 1개를 두어 granule 단위로\n읽기를 스킵한다. Bloom·set·minmax skip index는 추가 가속.\n",
+      "tags": [
+        "index",
+        "internals"
+      ],
+      "glossary": [
+        "B+Tree｜｜범위 검색용 균형 트리 인덱스",
+        "LSM tree｜｜쓰기에 강한 로그 구조 머지 트리",
+        "Bloom filter｜｜존재 여부를 확률로 판단하는 자료구조",
+        "DBMS｜｜데이터베이스 관리 시스템"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "다음 중 ClickHouse가 지원하지 않는 JOIN 알고리즘은?",
+      "choices": [
+        "hash",
+        "merge",
+        "nested loop",
+        "parallel hash"
+      ],
+      "answer": 2,
+      "explanation": "ClickHouse는 hash, parallel_hash, partial_merge, full_sorting_merge,\ngrace_hash, direct(딕셔너리) JOIN을 지원한다. 전통적 nested loop는\n옵션으로 존재하지 않는다 (직접 cross join + WHERE는 가능).\n",
+      "tags": [
+        "joins"
+      ],
+      "glossary": [
+        "hash join｜｜해시 테이블로 매칭하는 조인 방식",
+        "merge join｜｜정렬 후 병합하며 매칭하는 조인",
+        "parallel hash｜｜병렬로 수행하는 해시 조인",
+        "JOIN｜｜여러 테이블을 키로 결합하는 연산"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "ClickHouse의 PRIMARY KEY와 ORDER BY의 관계는?\n",
+      "choices": [
+        "항상 동일하다",
+        "PRIMARY KEY는 ORDER BY의 prefix여야 한다",
+        "무관하다",
+        "ORDER BY가 PRIMARY KEY의 prefix여야 한다"
+      ],
+      "answer": 1,
+      "explanation": "PRIMARY KEY를 생략하면 ORDER BY와 동일해진다. 명시할 경우\nPRIMARY KEY는 ORDER BY 컬럼의 prefix여야 한다. 인덱스는 PK 기준,\nsorting은 ORDER BY 기준.\n",
+      "tags": [
+        "schema",
+        "mergetree"
+      ],
+      "glossary": [
+        "PRIMARY KEY｜｜인덱스의 기준이 되는 기본 키",
+        "ORDER BY｜｜정렬 기준을 지정하는 절",
+        "prefix｜｜앞에서부터 이어지는 부분 컬럼 집합"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "ClickHouse의 ALTER TABLE ... DELETE WHERE는?\n",
+      "choices": [
+        "mutation으로 비동기 처리되어 part가 다시 쓰여진다",
+        "동기적 즉시 삭제",
+        "인덱스만 갱신",
+        "지원하지 않는다"
+      ],
+      "answer": 0,
+      "explanation": "ALTER DELETE/UPDATE는 mutation으로 부분이 다시 쓰여진다.\n대량 mutation은 비싸며 system.mutations에서 진행 상황을 관찰한다.\n",
+      "tags": [
+        "mutations"
+      ],
+      "glossary": [
+        "ALTER TABLE｜｜테이블 구조·데이터를 변경하는 명령",
+        "part｜｜MergeTree의 데이터 저장 묶음 단위",
+        "WHERE｜｜조건으로 대상 행을 거르는 절"
+      ]
+    },
+    {
+      "type": "mcq",
+      "q": "여러 노드에 데이터를 분산하면서 분산 쿼리도 지원하려면\n쓰는 엔진 조합은?\n",
+      "choices": [
+        "MergeTree only",
+        "Memory + Buffer",
+        "Kafka + Log",
+        "Distributed + (Replicated)MergeTree"
+      ],
+      "answer": 3,
+      "explanation": "각 노드에는 (Replicated)MergeTree를 두고, 그 위에 Distributed\n엔진 테이블이 분산 쿼리·INSERT 라우팅을 담당한다.\n",
+      "tags": [
+        "distributed",
+        "replication"
+      ],
+      "glossary": [
+        "MergeTree｜｜ClickHouse 기본 저장 엔진",
+        "Replicated｜｜노드 간 복제를 지원하는 엔진 접두",
+        "node｜｜클러스터를 이루는 개별 서버",
+        "Buffer｜｜메모리에 임시 모았다 기록하는 엔진"
+      ]
+    }
+  ]
+}
