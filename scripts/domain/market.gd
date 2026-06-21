@@ -33,13 +33,16 @@ static func base_price(rarity: String) -> int:
 	return int(BASE_PRICE.get(rarity, 300))
 
 
-static func sell_price(rarity: String, level: int, m: float, popular_bonus: float = 1.0) -> int:
-	var raw := float(base_price(rarity)) * m * (1.0 + LEVEL_BONUS * float(maxi(0, level))) * popular_bonus
+static func sell_price(rarity: String, level: int, m: float, popular_bonus: float = 1.0,
+		grade: int = 1, variant: bool = false) -> int:
+	var raw := float(base_price(rarity)) * m * (1.0 + LEVEL_BONUS * float(maxi(0, level))) \
+		* popular_bonus * Grade.price_mult(grade, variant)
 	return maxi(1, int(round(raw)))
 
 
-static func buy_price(rarity: String, level: int, m: float, popular_bonus: float = 1.0) -> int:
-	return maxi(1, int(round(float(sell_price(rarity, level, m, popular_bonus)) * BUY_SPREAD)))
+static func buy_price(rarity: String, level: int, m: float, popular_bonus: float = 1.0,
+		grade: int = 1, variant: bool = false) -> int:
+	return maxi(1, int(round(float(sell_price(rarity, level, m, popular_bonus, grade, variant)) * BUY_SPREAD)))
 
 
 # One step of the daily random walk.
@@ -77,11 +80,15 @@ static func roll_listings(m: float, popular: Dictionary, rng: RandomNumberGenera
 		var id: String = roll["id"]
 		var rarity: String = roll["rarity"]
 		var level := rng.randi_range(1, 10)
+		var grade := Grade.roll_grade(rng)
+		var variant := Grade.roll_variant(rng)
 		var bonus := float(popular.get("bonus", 1.0)) if String(popular.get("rarity", "")) == rarity else 1.0
 		listings.append({
 			"id": id,
 			"level": level,
-			"price": buy_price(rarity, level, m, bonus),
+			"grade": grade,
+			"variant": variant,
+			"price": buy_price(rarity, level, m, bonus, grade, variant),
 		})
 	return listings
 

@@ -153,10 +153,51 @@ func _build_odds_rows() -> void:
 		row.add_child(pct)
 		odds_box.add_child(row)
 	var note := Label.new()
-	note.text = "천장: 10연 내 에픽 이상 보장 · 31연부터 레전더리 확률 +10%p/회 · 40연 하드 천장 · 100스파크 = 원하는 친구 선택"
+	# 천장 수치는 domain/gacha.gd 상수와 일치시킨다(하드 75, 소프트 램프는 56번째 무-레전더리 뽑기부터).
+	note.text = "천장: 10연 내 에픽 이상 보장 · %d번째 무-레전더리 뽑기부터 레전더리 확률 +%d%%p/회 · %d연 하드 천장 · %d스파크 = 원하는 친구 선택" % [
+		Gacha.LEGENDARY_SOFT_START + 1, int(round(Gacha.LEGENDARY_SOFT_STEP * 100.0)), Gacha.LEGENDARY_HARD_PITY, Gacha.SPARK_TARGET]
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
 	odds_box.add_child(note)
+	_build_grade_odds_rows()
+
+
+# 등급(★) 굴림 확률 + 반짝(프레스티지) 공시 — 캐릭터 종 확률과 직교한 별도 레이어.
+# 수치 단일 출처는 domain/grade.gd의 ROLL_WEIGHTS / VARIANT_CHANCE.
+func _build_grade_odds_rows() -> void:
+	var gold: Color = ThemeSetup.RARITY_COLORS["legendary"]
+	var head := Label.new()
+	head.text = "등급(★) 확률 — 모든 친구에 공통 적용"
+	head.add_theme_font_size_override("font_size", 16)
+	head.add_theme_color_override("font_color", ThemeSetup.C_TEXT)
+	odds_box.add_child(head)
+	var total := 0
+	for g in Grade.ROLL_WEIGHTS:
+		total += int(Grade.ROLL_WEIGHTS[g])
+	for g: int in [1, 2, 3, 4, 5]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var star_l := Label.new()
+		star_l.text = Grade.stars(g)
+		star_l.custom_minimum_size = Vector2(220, 0)
+		star_l.add_theme_color_override("font_color", gold)
+		row.add_child(star_l)
+		var pct := Label.new()
+		pct.text = "%.1f%%" % (float(Grade.ROLL_WEIGHTS[g]) / float(total) * 100.0)
+		pct.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
+		row.add_child(pct)
+		odds_box.add_child(row)
+	# 반짝(이로치) — 등급과 직교한 0.5% 프레스티지.
+	var sp_row := HBoxContainer.new()
+	sp_row.add_theme_constant_override("separation", 8)
+	var sp_label := Icons.labeled("sparkle", "반짝 (프레스티지)", gold, 16)
+	sp_label.custom_minimum_size = Vector2(220, 0)
+	sp_row.add_child(sp_label)
+	var sp_pct := Label.new()
+	sp_pct.text = "%.1f%%" % (Grade.VARIANT_CHANCE * 100.0)
+	sp_pct.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
+	sp_row.add_child(sp_pct)
+	odds_box.add_child(sp_row)
 
 
 func _build_spark_popup() -> void:
@@ -198,7 +239,8 @@ func _on_pull(pay: String) -> void:
 		return
 	Sfx.play("gacha_spin")
 	_show_status("")
-	_show_single_result(String(r.get("id", "")), String(r.get("rarity", "common")))
+	_show_single_result(String(r.get("id", "")), String(r.get("rarity", "common")),
+		int(r.get("grade", 1)), bool(r.get("variant", false)))
 
 
 func _on_pull_ten() -> void:
@@ -230,7 +272,10 @@ func _on_spark_pick(id: String) -> void:
 		return
 	Sfx.play("gacha_spin")
 	_show_status("스파크 교환 완료!")
-	_show_single_result(String(r.get("id", "")), String(r.get("rarity", "common")))
+	# spark_redeem은 grade/variant를 돌려주지 않으니 부여된 개체에서 직접 읽어 표시한다.
+	var e: Dictionary = ProgressStore.get_character(int(r.get("uid", -1)))
+	_show_single_result(String(r.get("id", "")), String(r.get("rarity", "common")),
+		int(e.get("grade", 1)), bool(e.get("variant", false)))
 
 
 func _on_odds_toggle() -> void:
@@ -242,14 +287,16 @@ func _on_odds_toggle() -> void:
 # -----------------------------------------------------------------------------
 # 결과 연출
 # -----------------------------------------------------------------------------
-func _show_single_result(id: String, rarity: String) -> void:
+func _show_single_result(id: String, rarity: String, grade: int = 1, variant: bool = false) -> void:
 	_clear_results()
 	var center := CenterContainer.new()
 	result_area.add_child(center)
-	var card := _make_result_card(id, 128, 22)
+	var card := _make_result_card(id, 128, 22, grade, variant)
 	center.add_child(card)
-	if Characters.rarity_rank(rarity) >= Characters.rarity_rank("epic"):
-		_flash(ThemeSetup.RARITY_COLORS.get(rarity, Color.WHITE))
+	# ★5/반짝은 에픽급 연출(플래시)로 끌어올려 평범한 등급과 체감이 갈리게 한다.
+	var special := grade >= Grade.MAX or variant
+	if Characters.rarity_rank(rarity) >= Characters.rarity_rank("epic") or special:
+		_flash(ThemeSetup.RARITY_COLORS["legendary"] if special else ThemeSetup.RARITY_COLORS.get(rarity, Color.WHITE))
 	_pop_in(card, 0.0)
 	_reward_feedback(rarity, card)
 	_add_close_button()
@@ -266,24 +313,34 @@ func _show_ten_results(results: Array[Dictionary]) -> void:
 	center.add_child(grid)
 	var best_rank := -1
 	var best_rarity := ""
+	var any_special := false  # ★5 또는 반짝이 한 장이라도 있으면 골드 플래시
 	for i in results.size():
 		var rarity := String(results[i].get("rarity", "common"))
+		var grade := int(results[i].get("grade", 1))
+		var variant := bool(results[i].get("variant", false))
+		if grade >= Grade.MAX or variant:
+			any_special = true
 		if Characters.rarity_rank(rarity) > best_rank:
 			best_rank = Characters.rarity_rank(rarity)
 			best_rarity = rarity
-		var card := _make_result_card(String(results[i].get("id", "")), 56, 14)
+		var card := _make_result_card(String(results[i].get("id", "")), 56, 14, grade, variant)
 		grid.add_child(card)
 		_pop_in(card, 0.06 * i)
-	if best_rank >= Characters.rarity_rank("epic"):
-		_flash(ThemeSetup.RARITY_COLORS.get(best_rarity, Color.WHITE))
+	if best_rank >= Characters.rarity_rank("epic") or any_special:
+		_flash(ThemeSetup.RARITY_COLORS["legendary"] if any_special else ThemeSetup.RARITY_COLORS.get(best_rarity, Color.WHITE))
 	_reward_feedback(best_rarity, self)
 	_add_close_button()
 
 
-func _make_result_card(id: String, thumb_size: int, font_size: int) -> PanelContainer:
+func _make_result_card(id: String, thumb_size: int, font_size: int, grade: int = 1, variant: bool = false) -> PanelContainer:
 	var def := Characters.get_def(id)
 	var rarity := String(def.get("rarity", "common"))
+	var gold: Color = ThemeSetup.RARITY_COLORS["legendary"]
+	var special := grade >= Grade.MAX or variant
 	var card := PanelContainer.new()
+	# ★5/반짝 카드는 골드 테두리로 한눈에 특별하게(평범한 카드는 패널 기본 테두리).
+	if special:
+		card.add_theme_stylebox_override("panel", ThemeSetup.card(ThemeSetup.C_PANEL, gold, 14, true))
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 4)
@@ -301,6 +358,30 @@ func _make_result_card(id: String, thumb_size: int, font_size: int) -> PanelCont
 	rarity_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rarity_l.add_theme_color_override("font_color", ThemeSetup.RARITY_COLORS.get(rarity, ThemeSetup.C_TEXT))
 	box.add_child(rarity_l)
+	# ★ 등급(골드) — 이름·희귀도 바로 아래 작게. 글자 크기는 카드 크기에 맞춰 축소.
+	var grade_l := Label.new()
+	grade_l.text = Grade.stars(grade)
+	grade_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	grade_l.add_theme_font_size_override("font_size", maxi(12, font_size - 2))
+	grade_l.add_theme_color_override("font_color", gold)
+	box.add_child(grade_l)
+	# 반짝(프레스티지) / ★5 특별 태그 — 골드 칩으로 도드라지게(반짝 우선).
+	# 반짝은 sparkle 아이콘 칩, ★5는 텍스트 칩(타입이 갈려 분기 — 교차타입 삼항 회피).
+	if special:
+		var tag_wrap := CenterContainer.new()
+		var tag_fs := maxi(12, font_size - 2)
+		if variant:
+			var chip := Icons.labeled("sparkle", "반짝!", gold, tag_fs)
+			(chip.get_child(1) as Label).add_theme_font_size_override("font_size", tag_fs)
+			tag_wrap.add_child(chip)
+		else:
+			var chip := Label.new()
+			chip.text = "★5!"
+			chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			chip.add_theme_font_size_override("font_size", tag_fs)
+			chip.add_theme_color_override("font_color", gold)
+			tag_wrap.add_child(chip)
+		box.add_child(tag_wrap)
 	return card
 
 

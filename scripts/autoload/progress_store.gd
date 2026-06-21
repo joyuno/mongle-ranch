@@ -304,10 +304,12 @@ func gacha_pull(pay: String) -> Dictionary:
 	var result := Gacha.draw(get_pity(), rng)
 	progress["pity"] = result["pity"]
 	var uid := _grant_character(String(result["id"]))
+	var e := get_character(uid)
 	_persist()
 	progress_changed.emit()
 	pity_changed.emit(get_pity())
-	return { "ok": true, "uid": uid, "id": result["id"], "rarity": result["rarity"] }
+	return { "ok": true, "uid": uid, "id": result["id"], "rarity": result["rarity"],
+		"grade": int(e.get("grade", 1)), "variant": bool(e.get("variant", false)) }
 
 
 func spark_redeem(id: String) -> Dictionary:
@@ -326,9 +328,9 @@ func spark_redeem(id: String) -> Dictionary:
 # -----------------------------------------------------------------------------
 # Collection — merge / feed / level
 # -----------------------------------------------------------------------------
-# Sacrifice src (deleted forever) and add its levels onto dst. The only way
-# duplicates leave the collection besides selling.
-func merge_characters(src_uid: int, dst_uid: int) -> Dictionary:
+# 융합: 같은 종·같은 등급 2개 → dst 등급+1(★5 상한). src는 제물로 사라진다.
+# 중복 소진 싱크이자 등급 상승 경로(옛 레벨-합산 merge를 대체).
+func fuse_characters(src_uid: int, dst_uid: int) -> Dictionary:
 	if src_uid == dst_uid:
 		return { "ok": false, "reason": "same_character" }
 	var src := get_character(src_uid)
@@ -337,17 +339,74 @@ func merge_characters(src_uid: int, dst_uid: int) -> Dictionary:
 		return { "ok": false, "reason": "not_found" }
 	if String(src.get("id", "")) != String(dst.get("id", "")):
 		return { "ok": false, "reason": "different_species" }
+	if int(src.get("grade", 1)) != int(dst.get("grade", 1)):
+		return { "ok": false, "reason": "different_grade" }
+	if not Grade.can_fuse(int(dst.get("grade", 1))):
+		return { "ok": false, "reason": "max_grade" }
+	var res := Grade.fuse_result(int(dst.get("grade", 1)),
+		bool(src.get("variant", false)), bool(dst.get("variant", false)))
 	var col := get_collection()
 	for i in col.size():
 		if int(col[i].get("uid", -1)) == dst_uid:
-			col[i]["level"] = int(col[i].get("level", 1)) + int(src.get("level", 1))
-			character_leveled.emit(dst_uid, int(col[i]["level"]))
+			col[i]["grade"] = int(res["grade"])
+			col[i]["variant"] = bool(res["variant"])
+			character_leveled.emit(dst_uid, int(col[i].get("level", 1)))
 	progress["collection"] = col.filter(func(e): return int(e.get("uid", -1)) != src_uid)
 	_remove_from_roster(src_uid)
 	_persist()
 	progress_changed.emit()
 	collection_changed.emit()
-	return { "ok": true, "level": int(get_character(dst_uid).get("level", 1)) }
+	return { "ok": true, "grade": int(res["grade"]), "variant": bool(res["variant"]) }
+
+
+# 일괄 융합: 한 종의 같은 등급 중복쌍을 더 못 올릴 때까지 자동 융합. 반환 { ok, fused }.
+func batch_fuse(id: String) -> Dictionary:
+	var fused := 0
+	while true:
+		var seen := {}   # grade -> 대기 중인 uid
+		var matched := false
+		for e in get_collection():
+			if String(e.get("id", "")) != id or not Grade.can_fuse(int(e.get("grade", 1))):
+				continue
+			var g := int(e.get("grade", 1))
+			if seen.has(g):
+				fuse_characters(int(seen[g]), int(e.get("uid", -1)))
+				fused += 1
+				matched = true
+				break  # 변이 후 재스캔
+			seen[g] = int(e.get("uid", -1))
+		if not matched:
+			break
+	return { "ok": fused > 0, "fused": fused }
+
+
+# 절차적 교배: 부모 2마리(재료 소모) + 코인 → 자식 1마리. 부모는 사라진다(싱크).
+func breed_characters(a_uid: int, b_uid: int) -> Dictionary:
+	if a_uid == b_uid:
+		return { "ok": false, "reason": "same_character" }
+	var a := get_character(a_uid)
+	var b := get_character(b_uid)
+	if a.is_empty() or b.is_empty():
+		return { "ok": false, "reason": "not_found" }
+	if get_coins() < Breeding.COIN_COST:
+		return { "ok": false, "reason": "not_enough_coins" }
+	var child := Breeding.offspring(
+		String(a.get("id", "")), String(b.get("id", "")),
+		int(a.get("grade", 1)), int(b.get("grade", 1)),
+		bool(a.get("variant", false)), bool(b.get("variant", false)),
+		int(a.get("tint", 0)), int(b.get("tint", 0)), rng)
+	spend_coins(Breeding.COIN_COST)
+	progress["collection"] = get_collection().filter(func(e):
+		return int(e.get("uid", -1)) != a_uid and int(e.get("uid", -1)) != b_uid)
+	_remove_from_roster(a_uid)
+	_remove_from_roster(b_uid)
+	var uid := _grant_character(String(child["id"]), 1, {
+		"grade": int(child["grade"]), "variant": bool(child["variant"]), "tint": int(child["tint"]) })
+	_persist()
+	progress_changed.emit()
+	collection_changed.emit()
+	return { "ok": true, "uid": uid, "id": child["id"], "grade": int(child["grade"]),
+		"variant": bool(child["variant"]), "tint": int(child["tint"]) }
 
 
 # Feed a GitHub snack: +1 level and a happy emote (UI side).
@@ -451,7 +510,8 @@ func sell_character(uid: int) -> Dictionary:
 	var rarity := Characters.rarity_of(id)
 	var popular: Dictionary = market.get("popular", {})
 	var bonus := float(popular.get("bonus", 1.0)) if String(popular.get("rarity", "")) == rarity else 1.0
-	var price := Market.sell_price(rarity, int(e.get("level", 1)), float(market.get("m", 1.0)), bonus)
+	var price := Market.sell_price(rarity, int(e.get("level", 1)), float(market.get("m", 1.0)), bonus,
+		int(e.get("grade", 1)), bool(e.get("variant", false)))
 	progress["collection"] = get_collection().filter(func(c): return int(c.get("uid", -1)) != uid)
 	_remove_from_roster(uid)
 	market["soldToday"] = int(market.get("soldToday", 0)) + 1
@@ -471,7 +531,8 @@ func buy_listing(index: int) -> Dictionary:
 	var item: Dictionary = listings[index]
 	if not spend_coins(int(item.get("price", 0))):
 		return { "ok": false, "reason": "not_enough_coins" }
-	var uid := _grant_character(String(item.get("id", "")), int(item.get("level", 1)))
+	var uid := _grant_character(String(item.get("id", "")), int(item.get("level", 1)),
+		{ "grade": int(item.get("grade", 1)), "variant": bool(item.get("variant", false)) })
 	listings.remove_at(index)
 	market["listings"] = listings
 	progress["market"] = market
@@ -575,14 +636,20 @@ func set_font_size_scale(scale: int) -> void:
 # -----------------------------------------------------------------------------
 # Internal helpers
 # -----------------------------------------------------------------------------
-func _grant_character(id: String, level: int = 1) -> int:
+func _grant_character(id: String, level: int = 1, opts: Dictionary = {}) -> int:
 	var uid := int(progress.get("nextUid", 1))
 	progress["nextUid"] = uid + 1
+	# 등급·반짝은 획득 시 굴린다(opts로 주면 그 값 사용 — 교배/융합 결과 주입용).
+	var grade := int(opts["grade"]) if opts.has("grade") else Grade.roll_grade(rng)
+	var variant := bool(opts["variant"]) if opts.has("variant") else Grade.roll_variant(rng)
 	var col := get_collection()
 	col.append({
 		"uid": uid,
 		"id": id,
 		"level": maxi(1, level),
+		"grade": Grade.clamp_grade(grade),
+		"variant": variant,
+		"tint": int(opts.get("tint", 0)),  # 0 = 색조 없음(원본), >0 = 교배 색조 hue
 		"obtainedAt": Time.get_datetime_string_from_system(true),
 	})
 	progress["collection"] = col
@@ -680,6 +747,9 @@ func _sanitize(p: Dictionary) -> Dictionary:
 			continue
 		e["uid"] = int(e.get("uid", 0))
 		e["level"] = clampi(int(e.get("level", 1)), 1, 99999)
+		e["grade"] = Grade.clamp_grade(int(e.get("grade", 1)))  # 레거시 세이브 → ★1
+		e["variant"] = bool(e.get("variant", false))
+		e["tint"] = clampi(int(e.get("tint", 0)), 0, 359)
 		max_uid = maxi(max_uid, int(e["uid"]))
 		clean.append(e)
 		if clean.size() >= COLLECTION_CAP:

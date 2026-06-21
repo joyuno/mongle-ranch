@@ -165,6 +165,11 @@ func _make_listing_card(item: Dictionary, index: int) -> PanelContainer:
 	var def := Characters.get_def(id)
 	var rarity := String(def.get("rarity", "common"))
 	var price := int(item.get("price", 0))
+	# 등급·반짝·색조 — 매물 dict에 함께 실려 온다. 가격(item.price)은 이미
+	# buy_price에 grade/variant가 반영된 확정값이므로 그대로 표시한다.
+	var grade := int(item.get("grade", 1))
+	var variant := bool(item.get("variant", false))
+	var tint := int(item.get("tint", 0))
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(170, 0)
 	var box := VBoxContainer.new()
@@ -172,7 +177,7 @@ func _make_listing_card(item: Dictionary, index: int) -> PanelContainer:
 	box.add_theme_constant_override("separation", 4)
 	card.add_child(box)
 	var thumb_wrap := CenterContainer.new()
-	thumb_wrap.add_child(_make_thumb(id, 72))
+	thumb_wrap.add_child(_make_thumb(id, 72, tint))
 	box.add_child(thumb_wrap)
 	var name_l := Label.new()
 	name_l.text = "%s Lv.%d" % [String(def.get("name", "?")), int(item.get("level", 1))]
@@ -183,6 +188,11 @@ func _make_listing_card(item: Dictionary, index: int) -> PanelContainer:
 	rarity_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rarity_l.add_theme_color_override("font_color", ThemeSetup.RARITY_COLORS.get(rarity, ThemeSetup.C_TEXT))
 	box.add_child(rarity_l)
+	# 등급 ★ + 반짝 프레스티지 배지 — 희귀도 바로 아래 가운데 정렬로 둔다.
+	var badge := _grade_badge(grade, variant)
+	if badge != null:
+		badge.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_child(badge)
 	var price_box := Icons.labeled("coin", ThemeSetup.fmt_int(price), ThemeSetup.C_TEXT, 18)
 	price_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	# 클립 방지: 6자리 가격(예 100,000+)도 잘리지 않게 라벨을 콘텐츠 크기로 유지.
@@ -222,9 +232,13 @@ func _rebuild_sell_list(market: Dictionary) -> void:
 		var def := Characters.get_def(id)
 		var rarity := String(def.get("rarity", "common"))
 		var level := int(e.get("level", 1))
-		# progress_store.sell_character와 동일한 공식으로 예상가 계산
+		var grade := int(e.get("grade", 1))
+		var variant := bool(e.get("variant", false))
+		var tint := int(e.get("tint", 0))
+		# progress_store.sell_character와 동일한 공식으로 예상가 계산.
+		# grade/variant를 넘겨 ★5·반짝 개체가 실제로 더 높은 예상가로 보이게 한다.
 		var bonus := float(popular.get("bonus", 1.0)) if String(popular.get("rarity", "")) == rarity else 1.0
-		var price := Market.sell_price(rarity, level, m, bonus)
+		var price := Market.sell_price(rarity, level, m, bonus, grade, variant)
 		# 2차 리뷰(major): 고정 컬럼으로 정렬 — [아이콘+이름 240][등급 100]
 		# [예상가 160][판매 120]. EXPAND_FILL이 만들던 거대한 빈공간 제거 + 행 압축.
 		var row := HBoxContainer.new()
@@ -235,7 +249,7 @@ func _rebuild_sell_list(market: Dictionary) -> void:
 		var name_col := HBoxContainer.new()
 		name_col.add_theme_constant_override("separation", 8)
 		name_col.custom_minimum_size = Vector2(240, 0)
-		name_col.add_child(_make_thumb(id, 36))
+		name_col.add_child(_make_thumb(id, 36, tint))
 		var name_l := Label.new()
 		name_l.text = "%s Lv.%d" % [String(def.get("name", "?")), level]
 		name_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -243,13 +257,21 @@ func _rebuild_sell_list(market: Dictionary) -> void:
 		name_col.add_child(name_l)
 		row.add_child(name_col)
 
-		# [컬럼2] 등급 — 100px 고정
+		# [컬럼2] 등급(희귀도 + ★등급/반짝) — 100px 고정.
+		# 희귀도 라벨 위에 ★ 등급·반짝 배지를 세로로 쌓아 한 컬럼 폭 안에서 보이게 한다.
+		var grade_col := VBoxContainer.new()
+		grade_col.custom_minimum_size = Vector2(100, 0)
+		grade_col.add_theme_constant_override("separation", 0)
+		grade_col.alignment = BoxContainer.ALIGNMENT_CENTER
 		var rarity_l := Label.new()
 		rarity_l.text = Characters.rarity_label(rarity)
-		rarity_l.custom_minimum_size = Vector2(100, 0)
 		rarity_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		rarity_l.add_theme_color_override("font_color", ThemeSetup.RARITY_COLORS.get(rarity, ThemeSetup.C_TEXT))
-		row.add_child(rarity_l)
+		grade_col.add_child(rarity_l)
+		var badge := _grade_badge(grade, variant)
+		if badge != null:
+			grade_col.add_child(badge)
+		row.add_child(grade_col)
 
 		# [컬럼3] 예상가 — 160px는 최소폭일 뿐, 콘텐츠가 길면 늘어나게 둔다.
 		# 클립 방지(기기 핵심): 6자리 예상가(예 100,000+)도 좁은 화면에서 잘리지 않게
@@ -365,8 +387,30 @@ func _wire_button(btn: Button) -> void:
 	btn.pressed.connect(Juice.punch.bind(btn))
 
 
+# 등급 배지 — 골드 ★등급 + (반짝이면) 반짝 스파클 큐. ★1·일반이면 null.
+# 희귀도 라벨 곁에 작게 붙여 가격 차이를 만드는 숨은 등급을 한눈에 드러낸다.
+func _grade_badge(grade: int, variant: bool) -> HBoxContainer:
+	if grade <= 1 and not variant:
+		return null
+	var gold: Color = ThemeSetup.RARITY_COLORS["legendary"]  # #C8941E
+	var box := HBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if grade > 1:
+		var star_l := Label.new()
+		star_l.text = Grade.stars(grade)
+		star_l.add_theme_font_size_override("font_size", 13)
+		star_l.add_theme_color_override("font_color", gold)
+		box.add_child(star_l)
+	if variant:
+		# 반짝(이로치) 프레스티지 — 골드 스파클 아이콘으로 또렷이 구분.
+		box.add_child(Icons.make("sparkle", gold, 14))
+	return box
+
+
 # 캐릭터 썸네일 — 에셋이 있으면 TextureRect, 없으면 id 해시 파스텔 ColorRect 폴백.
-func _make_thumb(id: String, size: int = 64) -> Control:
+# tint>0이면 교배 색조 셰이더를 입혀 hue를 회전(원본=0은 셰이더 없음).
+func _make_thumb(id: String, size: int = 64, tint: int = 0) -> Control:
 	var path := Characters.sprite_path(id)
 	if ResourceLoader.exists(path):
 		var tr := TextureRect.new()
@@ -374,6 +418,11 @@ func _make_thumb(id: String, size: int = 64) -> Control:
 		tr.custom_minimum_size = Vector2(size, size)
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if tint > 0:
+			var mat := ShaderMaterial.new()
+			mat.shader = load("res://assets/shaders/tint.gdshader")
+			mat.set_shader_parameter("hue_shift", float(tint) / 360.0)
+			tr.material = mat
 		return tr
 	var panel := Panel.new()
 	panel.custom_minimum_size = Vector2(size, size)

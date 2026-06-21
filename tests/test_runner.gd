@@ -23,6 +23,8 @@ func _initialize() -> void:
 	_test_leveling()
 	_test_pack_parser()
 	_test_pack_import()
+	_test_grade()
+	_test_breeding()
 	print("--- %d passed, %d failed ---" % [_passes, _failures])
 	quit(0 if _failures == 0 else 1)
 
@@ -77,14 +79,14 @@ func _test_gacha() -> void:
 			hits = false
 	_truthy(hits, "sinceEpic=9 → 항상 epic 이상")
 
-	# Hard pity: sinceLegendary=39 → guaranteed legendary.
-	var hard := { "sinceEpic": 0, "sinceLegendary": 39, "spark": 0 }
+	# Hard pity: sinceLegendary=74 → guaranteed legendary (천장 40→75 상향).
+	var hard := { "sinceEpic": 0, "sinceLegendary": 74, "spark": 0 }
 	var all_leg := true
 	for i in 20:
 		var r := Gacha.draw(hard, rng)
 		if String(r["rarity"]) != "legendary":
 			all_leg = false
-	_truthy(all_leg, "sinceLegendary=39 → 확정 legendary")
+	_truthy(all_leg, "sinceLegendary=74 → 확정 legendary")
 
 	# Counters: epic draw resets sinceEpic but not necessarily legendary.
 	var res := Gacha.draw({ "sinceEpic": 9, "sinceLegendary": 5, "spark": 3 }, rng)
@@ -95,15 +97,15 @@ func _test_gacha() -> void:
 	else:
 		_eq(int(res["pity"]["sinceLegendary"]), 0, "legendary 획득 시 리셋")
 
-	# 40 sequential draws from zero always include ≥1 legendary (hard pity).
+	# 75 sequential draws from zero always include ≥1 legendary (hard pity).
 	var p := Gacha.default_pity()
 	var got_leg := false
-	for i in 40:
+	for i in 75:
 		var r := Gacha.draw(p, rng)
 		p = r["pity"]
 		if String(r["rarity"]) == "legendary":
 			got_leg = true
-	_truthy(got_leg, "40연 내 legendary 보장")
+	_truthy(got_leg, "75연 내 legendary 보장")
 
 	_truthy(not Gacha.spark_ready({ "spark": 99 }), "스파크 99 → 미달")
 	_truthy(Gacha.spark_ready({ "spark": 100 }), "스파크 100 → 사용 가능")
@@ -133,6 +135,10 @@ func _test_market() -> void:
 	_eq(Market.buy_price("common", 0, 1.0), 690, "구매가 = 판매가 × 2.3")
 	_truthy(Market.sell_price("epic", 5, 0.85) < Market.sell_price("epic", 5, 1.15), "시세 반영")
 	_eq(Market.sell_price("common", 0, 1.0, 1.5), 450, "인기일 보너스 1.5×")
+	# 등급/반짝 가격 차등.
+	_eq(Market.sell_price("common", 0, 1.0, 1.0, 5), 2100, "★5 일반 = 기본가 ×7")
+	_eq(Market.sell_price("common", 0, 1.0, 1.0, 1, true), 900, "반짝 = 기본가 ×3")
+	_eq(Market.sell_price("common", 0, 1.0, 1.0, 5, true), 6300, "★5 반짝 = ×7×3")
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
@@ -314,6 +320,66 @@ func _test_pack_import() -> void:
 	_eq(PackImport.list_user_packs().size(), before, "삭제 후 목록 원복")
 	# 번들(res://) 팩은 삭제 차단.
 	_eq(PackImport.delete_user_pack("res://data/quizzes/clickhouse-basics.json"), false, "번들 팩 삭제 차단")
+
+
+# -----------------------------------------------------------------------------
+# Grade (개체 등급 ★ + 반짝)
+# -----------------------------------------------------------------------------
+func _test_grade() -> void:
+	_section("Grade")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var in_range := true
+	var ones := 0
+	for i in 2000:
+		var g := Grade.roll_grade(rng)
+		if g < 1 or g > 5:
+			in_range = false
+		if g == 1:
+			ones += 1
+	_truthy(in_range, "등급 롤 1~5 범위")
+	_truthy(ones > 1000, "★1 최빈 (2000회 중 절반 초과, 실측 %d)" % ones)
+	_eq(Grade.clamp_grade(0), 1, "클램프 하한 ★1")
+	_eq(Grade.clamp_grade(9), 5, "클램프 상한 ★5")
+	_eq(Grade.stars(3), "★★★", "별 문자열")
+	_truthy(is_equal_approx(Grade.price_mult(1), 1.0), "★1 가격배수 1.0")
+	_truthy(is_equal_approx(Grade.price_mult(5), 7.0), "★5 가격배수 7.0")
+	_truthy(is_equal_approx(Grade.price_mult(1, true), 3.0), "반짝 ×3")
+	_truthy(Grade.can_fuse(4) and not Grade.can_fuse(5), "★5는 융합 불가")
+	var f := Grade.fuse_result(2, false, true)
+	_eq(int(f["grade"]), 3, "융합 → 등급+1")
+	_truthy(bool(f["variant"]), "융합 시 반짝 유지(OR)")
+	_eq(int(Grade.fuse_result(5, false, false)["grade"]), 5, "★5 융합 상한 유지")
+
+
+# -----------------------------------------------------------------------------
+# Breeding (절차적 교배)
+# -----------------------------------------------------------------------------
+func _test_breeding() -> void:
+	_section("Breeding")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026
+	var ok := true
+	for i in 500:
+		var c := Breeding.offspring("moka", "kongkong", 2, 4, false, false, 0, 0, rng)
+		if Characters.get_def(String(c["id"])).is_empty():
+			ok = false
+		var g := int(c["grade"])
+		if g < 1 or g > 5:
+			ok = false
+		var t := int(c["tint"])
+		if t < 1 or t > 359:
+			ok = false
+		if typeof(c["variant"]) != TYPE_BOOL:
+			ok = false
+	_truthy(ok, "교배 자식 구조 유효 (유효 종·등급1~5·색조1~359·반짝 bool)")
+	# 변이 포함 종 다양성: common×common이라도 변이로 상위 종 등장 가능.
+	rng.seed = 7
+	var species := {}
+	for i in 300:
+		var c := Breeding.offspring("moka", "kongkong", 3, 3, false, false, 0, 0, rng)
+		species[String(c["id"])] = true
+	_truthy(species.size() >= 2, "교배 결과 종 다양성 (변이 포함, 실측 %d종)" % species.size())
 
 
 # -----------------------------------------------------------------------------

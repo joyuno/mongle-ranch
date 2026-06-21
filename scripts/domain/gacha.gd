@@ -3,9 +3,10 @@
 #
 # Design source: docs/GAME_DESIGN.md §2. Pity ladder:
 #   * soft pity A : every 10th pull (sinceEpic >= 9) guarantees epic-or-better
-#   * soft pity B : from the 31st legendary-less pull, legendary chance grows
-#                   +10%p per pull (sinceLegendary >= 30)
-#   * hard pity   : the 40th legendary-less pull is a guaranteed legendary
+#   * soft pity B : from the 56th legendary-less pull, legendary chance grows
+#                   +10%p per pull (sinceLegendary >= 55)
+#   * hard pity   : the 75th legendary-less pull is a guaranteed legendary
+#                   (raised 40 -> 75: legendary was saturating too fast)
 #   * spark       : every pull grants +1 spark point; at 100 the player may
 #                   pick any character outright (handled by the store/UI —
 #                   this module only counts).
@@ -15,9 +16,9 @@ extends RefCounted
 
 const PULL_COST_COIN: int = 1000
 const EPIC_PITY_EVERY: int = 10      # pulls per guaranteed epic+
-const LEGENDARY_SOFT_START: int = 30 # sinceLegendary at which the ramp begins
+const LEGENDARY_SOFT_START: int = 55 # sinceLegendary at which the ramp begins
 const LEGENDARY_SOFT_STEP: float = 0.10
-const LEGENDARY_HARD_PITY: int = 40
+const LEGENDARY_HARD_PITY: int = 75
 const SPARK_TARGET: int = 100
 
 

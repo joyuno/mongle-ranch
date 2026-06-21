@@ -36,6 +36,9 @@ const EMOTE_FALLBACK := "message-circle"
 var uid: int = -1
 var char_id: String = ""
 var level: int = 1
+var grade: int = 1          # ★ 등급(1..5) — 같은 종 융합으로 상승
+var variant: bool = false   # 반짝(이로치) 프레스티지
+var tint: int = 0           # 교배 색조(0..359, 0=원본). >0이면 hue-rotate 셰이더
 var personality: Dictionary = {}
 var bounds_provider: Callable = Callable()
 var friend_position_provider: Callable = Callable()  # call(exclude_uid) -> Vector2 (없으면 Vector2.INF)
@@ -44,6 +47,7 @@ var _body: TextureRect
 var _emote_bubble: PanelContainer
 var _emote_icon: TextureRect
 var _level_label: Label
+var _sparkle: TextureRect   # 반짝 프레스티지 영구 표식(variant일 때만)
 var _breath_tween: Tween
 var _use_fallback := false
 var _fallback_color := Color.WHITE
@@ -59,11 +63,14 @@ var _bounce_tween: Tween
 var _rng := RandomNumberGenerator.new()
 
 
-# ranch가 add_child 전에 호출. entry = { uid, id, level } (ProgressStore 컬렉션 항목).
+# ranch가 add_child 전에 호출. entry = { uid, id, level, grade, variant, tint } (ProgressStore 컬렉션 항목).
 func setup(entry: Dictionary, bounds_provider_cb: Callable, friend_provider: Callable = Callable()) -> void:
 	uid = int(entry.get("uid", -1))
 	char_id = String(entry.get("id", ""))
 	level = int(entry.get("level", 1))
+	grade = int(entry.get("grade", 1))
+	variant = bool(entry.get("variant", false))
+	tint = int(entry.get("tint", 0))
 	bounds_provider = bounds_provider_cb
 	friend_position_provider = friend_provider
 	var def := Characters.get_def(char_id)
@@ -99,6 +106,13 @@ func _build_nodes() -> void:
 	var path := Characters.sprite_path(char_id)
 	if ResourceLoader.exists(path):
 		_body.texture = load(path)
+		# 교배 색조 — tint>0이면 hue-rotate 셰이더로 베이크된 PNG를 리컬러(채도·명도 보존).
+		# tint==0(원본색)은 머티리얼을 달지 않는다 — 불필요한 drawcall 방지.
+		if tint > 0:
+			var mat := ShaderMaterial.new()
+			mat.shader = load("res://assets/shaders/tint.gdshader")
+			mat.set_shader_parameter("hue_shift", float(tint) / 360.0)
+			_body.material = mat
 	else:
 		_use_fallback = true
 		_fallback_color = _pastel_from_id(char_id)
@@ -130,9 +144,11 @@ func _build_nodes() -> void:
 	_emote_bubble.add_child(_emote_icon)
 	add_child(_emote_bubble)
 
-	# 레벨 라벨 (발밑) — 평소 숨김, hover 시에만(디버그 라벨 인상 제거). 외곽선.
+	# 레벨 라벨 (발밑) — 평소 숨김, hover/탭 시에만(디버그 라벨 인상 제거). 외곽선.
+	# 등급 ★는 별도 칩 대신 이 라벨에 병기 — 마당이 빽빽하므로 평소엔 감추고
+	# 탭했을 때만 "Lv.3 ★★" 형태로 드러내 클러터를 막는다(CONTEXT: keep it subtle).
 	_level_label = Label.new()
-	_level_label.text = "Lv.%d" % level
+	_level_label.text = _level_text()
 	_level_label.size = Vector2(SPRITE_SIZE, 16)
 	_level_label.position = Vector2(0, SPRITE_SIZE - 12)
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -145,6 +161,15 @@ func _build_nodes() -> void:
 	add_child(_level_label)
 	mouse_entered.connect(func(): _level_label.visible = true)
 	mouse_exited.connect(func(): _level_label.visible = false)
+
+	# 반짝(variant) — 프레스티지는 희귀하므로 머리 위 작은 골드 sparkle을 영구 표시.
+	# 등급과 달리 항상 보이게 둬 "특별한 개체"를 한눈에 읽히게 한다.
+	if variant:
+		_sparkle = Icons.make("sparkle", ThemeSetup.RARITY_COLORS["legendary"], 16)
+		_sparkle.position = Vector2(SPRITE_SIZE * 0.5 + 18.0, 6.0)
+		_sparkle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_sparkle)
+		_start_sparkle_pulse()
 
 
 # 발밑 그림자 — 깊이(스폰 y) 비례 + 2겹 소프트 엣지 + INK 톤(순흑 금지).
@@ -186,6 +211,24 @@ func _draw_fallback_body() -> void:
 static func _pastel_from_id(id: String) -> Color:
 	var hue := float(absi(id.hash()) % 360) / 360.0
 	return Color.from_hsv(hue, 0.38, 0.95)
+
+
+# 레벨 라벨 텍스트 — 등급이 2 이상이면 ★를 병기("Lv.3 ★★"). ★1은 기본값이라 생략.
+func _level_text() -> String:
+	if grade > 1:
+		return "Lv.%d %s" % [level, Grade.stars(grade)]
+	return "Lv.%d" % level
+
+
+# 반짝 표식 — 골드 sparkle을 은은히 맥동(존재감만, 시선 강탈 금지).
+func _start_sparkle_pulse() -> void:
+	if _sparkle == null:
+		return
+	var t := create_tween().set_loops()
+	t.tween_property(_sparkle, "modulate:a", 0.55, 1.1) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_property(_sparkle, "modulate:a", 1.0, 1.1) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 # -----------------------------------------------------------------------------
@@ -463,7 +506,7 @@ func _joy_jump() -> void:
 func react_levelup(new_level: int = -1) -> void:
 	if new_level > 0:
 		level = new_level
-		_level_label.text = "Lv.%d" % level
+		_level_label.text = _level_text()
 	_show_emote("⬆️", 1.5)
 	# 레벨업 펄스는 _body에(루트 scale은 깊이 전용). 끝나면 숨쉬기 재개.
 	if _breath_tween and _breath_tween.is_valid():
