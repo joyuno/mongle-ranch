@@ -38,6 +38,7 @@ var passage_panel: PanelContainer
 var passage_label: Label
 var question_label: Label
 var choices_box: VBoxContainer
+var glossary_box: VBoxContainer
 
 var feedback_panel: PanelContainer
 var feedback_title: Label
@@ -407,6 +408,13 @@ func _build_session_ui() -> void:
 	question_label.add_theme_font_size_override("font_size", 22)
 	session_root.add_child(question_label)
 
+	# 용어 카드 — 질문 아래, 보기 위. 문항의 glossary 필드로 채움(없으면 숨김).
+	glossary_box = VBoxContainer.new()
+	glossary_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	glossary_box.add_theme_constant_override("separation", 6)
+	glossary_box.visible = false
+	session_root.add_child(glossary_box)
+
 	choices_box = VBoxContainer.new()
 	choices_box.add_theme_constant_override("separation", 8)
 	session_root.add_child(choices_box)
@@ -537,6 +545,7 @@ func _render_question(q: Dictionary) -> void:
 	passage_label.text = passage
 
 	question_label.text = String(q.get("q", ""))
+	_render_glossary(q.get("glossary", []))
 
 	_clear_children(choices_box)
 	match String(q.get("type", "")):
@@ -769,6 +778,79 @@ func _paint_button(btn: Button, border: Color) -> void:
 		btn.add_theme_stylebox_override(s, sb)
 	btn.add_theme_color_override("font_disabled_color", ThemeSetup.C_TEXT)
 	btn.add_theme_color_override("font_color", ThemeSetup.C_TEXT)
+
+
+# ── 용어 카드 (glossary) — 문항의 질문·보기 속 어려운 용어를 쉬운 설명 카드로.
+# 'word｜reading｜meaning' 스칼라(또는 dict)를 파싱. reading 비면 생략. 설명은
+# 길 수 있어 카드 폭 안에서 줄바꿈한다. (godot 본가 quiz.gd에서 이식)
+func _render_glossary(entries) -> void:
+	_clear_children(glossary_box)
+	var list: Array = entries if typeof(entries) == TYPE_ARRAY else []
+	if list.is_empty():
+		glossary_box.visible = false
+		return
+	glossary_box.visible = true
+	var header := Label.new()
+	header.text = "📖 용어 카드 — 모르는 단어 설명"
+	header.add_theme_font_size_override("font_size", 13)
+	header.add_theme_color_override("font_color", ThemeSetup.C_ACCENT)
+	glossary_box.add_child(header)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 6)
+	glossary_box.add_child(flow)
+	for e in list:
+		var card := _make_gloss_card(e)
+		if card != null:
+			flow.add_child(card)
+
+
+func _make_gloss_card(entry) -> Control:
+	var word := ""
+	var reading := ""
+	var meaning := ""
+	if typeof(entry) == TYPE_DICTIONARY:
+		word = String(entry.get("word", ""))
+		reading = String(entry.get("reading", ""))
+		meaning = String(entry.get("meaning", ""))
+	else:
+		var parts := String(entry).replace("|", "｜").split("｜")
+		if parts.size() >= 1: word = parts[0].strip_edges()
+		if parts.size() >= 2: reading = parts[1].strip_edges()
+		if parts.size() >= 3: meaning = parts[2].strip_edges()
+	if word.is_empty():
+		return null
+
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _stylebox(ThemeSetup.C_PANEL_2, ThemeSetup.C_BORDER, 7))
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 1)
+	panel.add_child(vb)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	vb.add_child(top)
+	var word_label := Label.new()
+	word_label.text = word
+	word_label.add_theme_font_size_override("font_size", 16)
+	word_label.add_theme_color_override("font_color", ThemeSetup.C_TEXT)
+	top.add_child(word_label)
+	if not reading.is_empty():
+		var reading_label := Label.new()
+		reading_label.text = reading
+		reading_label.add_theme_font_size_override("font_size", 13)
+		reading_label.add_theme_color_override("font_color", ThemeSetup.C_OK)
+		reading_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top.add_child(reading_label)
+
+	var meaning_label := Label.new()
+	meaning_label.text = meaning if not meaning.is_empty() else "—"
+	meaning_label.add_theme_font_size_override("font_size", 13)
+	meaning_label.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
+	meaning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	meaning_label.custom_minimum_size = Vector2(240, 0)
+	vb.add_child(meaning_label)
+	return panel
 
 
 func _wire_button(btn: Button) -> void:
