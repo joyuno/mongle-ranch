@@ -59,15 +59,18 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP  # 드래그 회전 입력 수신
 	_build_materials()
 	_vp = SubViewport.new()
-	_vp.transparent_bg = true
+	# 투명 3D SubViewport는 GL Compatibility(우리 렌더러)에서 불안정 → 솔리드 크림 배경.
+	_vp.transparent_bg = false
 	_vp.own_world_3d = true
 	_vp.msaa_3d = Viewport.MSAA_2X
 	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_vp.size = Vector2i(480, 320)  # 레이아웃 전에도 렌더 타깃 크기 확보(stretch가 이후 갱신)
 	add_child(_vp)
 
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_CLEAR_COLOR
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color("#FAF4E8")   # 패널과 동일 크림 톤
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(1, 1, 1)
 	e.ambient_light_energy = 0.75
