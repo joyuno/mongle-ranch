@@ -52,6 +52,29 @@
       "answer": 2,
       "figure": "hcp",
       "explanation": "HCP와 FCC 모두 최조밀 충진 구조로 충진율 74%. SC는 52%, BCC는 68%."
+    },
+    {
+      "type": "mcq",
+      "q": "GaAs·ZnS가 갖는 섬아연광(zinc blende) 구조의 특징으로 옳은 것은?",
+      "choices": ["FCC 한 종류 원자만으로 구성", "FCC 부격자 + 사면체 자리에 다른 원소", "단순입방 + 체심", "육방 격자"],
+      "answer": 1,
+      "figure": "zincblende",
+      "explanation": "섬아연광은 다이아몬드 구조와 같되 두 원소(예: Ga·As)가 각각 FCC 부격자와 사면체 자리를 차지하는 화합물 반도체 구조다."
+    },
+    {
+      "type": "mcq",
+      "q": "암염(NaCl) 구조에서 각 이온의 배위수(coordination number)는?",
+      "choices": ["4", "6", "8", "12"],
+      "answer": 1,
+      "figure": "rocksalt",
+      "explanation": "NaCl은 두 FCC 격자가 맞물린 구조로, 각 이온이 반대 부호 이온 6개에 둘러싸인다(6배위)."
+    },
+    {
+      "type": "ox",
+      "q": "염화세슘(CsCl) 구조는 단일 원소 체심입방(BCC)과 동일하다.",
+      "answer": false,
+      "figure": "cscl",
+      "explanation": "겉모습은 비슷하나 체심 자리에 다른 이온(Cl)이 오므로 단일 원소 BCC가 아니다. 배위수는 8."
     }
   ]
 }

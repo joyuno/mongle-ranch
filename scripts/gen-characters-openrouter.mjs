@@ -66,6 +66,19 @@ const CHARACTERS = [
   { id: 'byeolgaru', seed: 110, desc: 'a pastel lavender star-candy fairy, plump eight-pointed star-shaped sugar body with rounded bumpy points, a few tiny pale-yellow sparkles floating around it' },
   { id: 'buong',     seed: 111, desc: 'a pastel purple baby owl with short horn-like ear tufts angled outward, sleepy half-closed dot eyes, lighter belly with soft scalloped feather rows, tiny orange beak and feet' },
   { id: 'geumbung',  seed: 112, desc: 'a golden fish-shaped pastry, plump fish silhouette bread with a crisp waffle grid texture, forked tail fin and a small rounded dorsal fin, subtle golden sheen highlight' },
+  // ── 확장 12종 (seeds 113–124) ────────────────────────────────────────────
+  { id: 'dorong',    seed: 113, desc: 'a soft dusty-pink axolotl, three feathery frilly external gill branches fanning out from each side of its head, wide flat smiling muzzle, lighter belly, short stubby legs and a small rounded tail' },
+  { id: 'gosum',     seed: 114, desc: 'a small beige hedgehog whose back is covered in rows of short rounded blunt quills like soft bumps, paler round face and tummy, tiny dark nose, little paws' },
+  { id: 'gaegul',    seed: 115, desc: 'a dusty mint-green frog with two big round bulging eyes perched on top of its head, wide flat smiling mouth, paler creamy belly, short bent legs ready to hop' },
+  { id: 'ddalbang',  seed: 116, desc: 'a rounded strawberry-milk droplet creature, soft pale pink teardrop body with a small green strawberry calyx and stem on top, faint scatter of tiny seed dots on its cheeks' },
+  { id: 'sikppang',  seed: 117, desc: 'a single thick slice of white bread shaped like a cat, golden-tan crust running around its squared outline, two little crust-colored triangle ears on top, drowsy soft face' },
+  { id: 'mongsong',  seed: 118, desc: 'a plump dove-grey baby seal, smooth rounded body with two short flat front flippers, fine whisker dots on a paler muzzle, big calm dark eyes, tiny stubby tail' },
+  { id: 'dalbo',     seed: 119, desc: 'a tiny dandelion-seed sprite, pale cream fluffy round seed-head puff worn like a cap on top, slender beige stem body, a few loose wispy white seed tufts drifting beside it' },
+  { id: 'beoseot',   seed: 120, desc: 'a small dusty-red toadstool, rounded domed cap dotted with soft cream spots worn over its head like a hat, short pale stout stalk body, little rounded base' },
+  { id: 'jogyak',    seed: 121, desc: 'a smooth grey riverstone spirit, rounded pebble body with a small tuft of soft green moss growing on its crown, faint paler speckles, calm quiet face' },
+  { id: 'haedal',    seed: 122, desc: 'a pastel amethyst-purple seahorse, curled spiral tail, small ridged dorsal fin along its back, gently arched snout, tiny bumpy crest ridge on its head' },
+  { id: 'gureum',    seed: 123, desc: 'a fluffy cotton-candy cloud sprite, soft off-white scalloped puffy cloud body, a small pastel rainbow arc floating just above its head, gentle dreamy face' },
+  { id: 'byeolttong', seed: 124, desc: 'a pastel falling-star creature, plump rounded five-pointed star body trailing a tapered soft glowing comet tail behind it, a couple of tiny sparkle dots in its wake' },
 ];
 
 async function loadEnv() {

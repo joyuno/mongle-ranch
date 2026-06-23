@@ -5,7 +5,7 @@
 class_name FigureView
 extends SubViewportContainer
 
-const ATOM_R := 0.13
+const ATOM_R := 0.115   # 화합물(rocksalt/fluorite)은 원자가 많아 약간 작게 → 가독성
 const COL_CORNER := Color("#7FA8D8")   # 코너
 const COL_FACE := Color("#E79AA0")     # 면심
 const COL_BODY := Color("#8FC9AE")     # 체심
@@ -38,6 +38,14 @@ static func caption_for(name: String) -> String:
 			return "다이아몬드 구조(Si·Ge): FCC(4) + 내부 4 = 유효 8개"
 		"hcp", "육방조밀":
 			return "육방조밀(HCP): 유효 6개, 충진율 74% (c/a ≈ 1.633)"
+		"zincblende", "zinc_blende", "sphalerite", "섬아연광", "gaas", "zns":
+			return "섬아연광(ZnS·GaAs): FCC + 사면체 자리 4 — 화합물 반도체 구조"
+		"rocksalt", "rock_salt", "nacl", "halite", "암염":
+			return "암염(NaCl): 두 FCC 격자가 맞물린 구조, 각 이온 6배위"
+		"cscl", "cesium_chloride", "염화세슘":
+			return "염화세슘(CsCl): 단순입방 + 체심에 다른 이온, 8배위"
+		"fluorite", "caf2", "calcium_fluoride", "형석":
+			return "형석(CaF2): Ca FCC + F 8개 사면체 자리"
 		_:
 			return ""
 
@@ -71,8 +79,15 @@ func _ready() -> void:
 	key.light_energy = 1.1
 	_vp.add_child(key)
 
+	# 반대편 약한 필 라이트 — 그림자 쪽 원자도 색이 읽히도록(가독성).
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(40, 145, 0)
+	fill.light_energy = 0.45
+	_vp.add_child(fill)
+
+	# 카메라 거리: 회전 시 셀 체대각(≈0.87) + 원자 반지름이 항상 화면에 들어오도록 여유.
 	var cam := Camera3D.new()
-	cam.position = Vector3(0, 0, 2.9)
+	cam.position = Vector3(0, 0, 3.6)
 	cam.fov = 32.0
 	_vp.add_child(cam)
 
@@ -150,6 +165,22 @@ func _rebuild() -> void:
 				Vector3(0.75, 0.25, 0.75), Vector3(0.25, 0.75, 0.75)])
 		"hcp", "육방조밀":
 			_hcp()
+		"zincblende", "zinc_blende", "sphalerite", "섬아연광", "gaas", "zns":
+			# A = FCC 부격자(코너+면), B = 사면체 자리 4개. 두 원소 → 두 색.
+			_compound_fcc([
+				Vector3(0.25, 0.25, 0.25), Vector3(0.75, 0.75, 0.25),
+				Vector3(0.75, 0.25, 0.75), Vector3(0.25, 0.75, 0.75)])
+		"rocksalt", "rock_salt", "nacl", "halite", "암염":
+			_rocksalt()
+		"cscl", "cesium_chloride", "염화세슘":
+			_cscl()
+		"fluorite", "caf2", "calcium_fluoride", "형석":
+			# Ca = FCC 부격자, F = 8개 사면체 자리 전부.
+			_compound_fcc([
+				Vector3(0.25, 0.25, 0.25), Vector3(0.75, 0.25, 0.25),
+				Vector3(0.25, 0.75, 0.25), Vector3(0.25, 0.25, 0.75),
+				Vector3(0.75, 0.75, 0.25), Vector3(0.75, 0.25, 0.75),
+				Vector3(0.25, 0.75, 0.75), Vector3(0.75, 0.75, 0.75)])
 		_:
 			pass
 
@@ -177,6 +208,51 @@ func _cubic(face: bool, body: bool, interior: Array) -> void:
 		_atom(_c(0.5, 0.5, 0.5), _mat_body)
 	for v in interior:
 		_atom(_c(v.x, v.y, v.z), _mat_inner)
+
+
+# 셀 모서리 + 8 코너 원자(공통). 코너 색은 mat 인자로 받는다(화합물 부격자 구분).
+func _cell_frame(corner_mat: StandardMaterial3D) -> void:
+	var corners: Array[Vector3] = [
+		_c(0, 0, 0), _c(1, 0, 0), _c(1, 1, 0), _c(0, 1, 0),
+		_c(0, 0, 1), _c(1, 0, 1), _c(1, 1, 1), _c(0, 1, 1)]
+	var edges := [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
+		[0, 4], [1, 5], [2, 6], [3, 7]]
+	for e: Array in edges:
+		_edge(corners[e[0]], corners[e[1]])
+	for v: Vector3 in corners:
+		_atom(v, corner_mat)
+
+
+# 화합물 FCC 구조: 원소 A가 FCC 부격자(코너+면) 전부 = COL_CORNER 한 색,
+# 원소 B는 interior 사면체 자리 = COL_FACE 한 색. (zincblende / fluorite)
+func _compound_fcc(interior: Array) -> void:
+	_cell_frame(_mat_corner)
+	for v: Vector3 in [_c(0.5, 0.5, 0), _c(0.5, 0.5, 1), _c(0.5, 0, 0.5),
+			_c(0.5, 1, 0.5), _c(0, 0.5, 0.5), _c(1, 0.5, 0.5)]:
+		_atom(v, _mat_corner)
+	for v: Vector3 in interior:
+		_atom(_c(v.x, v.y, v.z), _mat_face)
+
+
+# 암염(NaCl): A = FCC(코너 8 + 면 6), B = 모서리 중점 12 + 체심 1. 맞물린 두 FCC.
+func _rocksalt() -> void:
+	_cell_frame(_mat_corner)
+	for v: Vector3 in [_c(0.5, 0.5, 0), _c(0.5, 0.5, 1), _c(0.5, 0, 0.5),
+			_c(0.5, 1, 0.5), _c(0, 0.5, 0.5), _c(1, 0.5, 0.5)]:
+		_atom(v, _mat_corner)
+	# 12 모서리 중점.
+	for v: Vector3 in [
+			_c(0.5, 0, 0), _c(0.5, 1, 0), _c(0.5, 0, 1), _c(0.5, 1, 1),
+			_c(0, 0.5, 0), _c(1, 0.5, 0), _c(0, 0.5, 1), _c(1, 0.5, 1),
+			_c(0, 0, 0.5), _c(1, 0, 0.5), _c(0, 1, 0.5), _c(1, 1, 0.5)]:
+		_atom(v, _mat_face)
+	_atom(_c(0.5, 0.5, 0.5), _mat_face)  # 체심
+
+
+# 염화세슘(CsCl): A = 코너 8, B = 체심 1. bcc 아님(서로 다른 이온 → 두 색).
+func _cscl() -> void:
+	_cell_frame(_mat_corner)
+	_atom(_c(0.5, 0.5, 0.5), _mat_face)
 
 
 func _hcp() -> void:

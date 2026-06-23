@@ -31,7 +31,7 @@ let _blushSeq = 0;
 // 두 점 모두 또렷하게(opacity↑) — 24종 시선의 생기를 통일하는 결정타.
 const eye = (x, y, r = 12) =>
   `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}"/>` +
-  `<circle cx="${x + r * 0.34}" cy="${y - r * 0.34}" r="${(r * 0.32).toFixed(1)}" fill="#FFFFFF"/>` +
+  `<circle cx="${x + r * 0.34}" cy="${y - r * 0.34}" r="${(r * 0.26).toFixed(1)}" fill="#FFFFFF" opacity="0.9"/>` +
   `<circle cx="${x - r * 0.30}" cy="${y + r * 0.36}" r="${(r * 0.15).toFixed(1)}" fill="#FFFFFF" opacity="0.78"/>`;
 
 // 졸린 점눈(부엉): 납작한 타원 + 윗눈꺼풀 선.
@@ -109,7 +109,7 @@ function smoothStar(cx, cy, rOut, rIn, points) {
 // (librsvg feDropShadow는 투명 영역을 칠하지 않음 — 합성 테스트로 확인).
 const GROUND_SHADOW =
   `<filter id="groundShadow" x="-25%" y="-25%" width="150%" height="150%">` +
-  `<feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="${INK}" flood-opacity="0.22"/></filter>`;
+  `<feDropShadow dx="0" dy="11" stdDeviation="7" flood-color="${INK}" flood-opacity="0.22"/></filter>`;
 
 function svgDoc(inner, defs = '') {
   return (
@@ -145,7 +145,7 @@ function hslHex(h, s, l) {
 
 // 몸색: 어른향 '더스티 파스텔'. 밝은 베이비 파스텔(L0.86)이 아니라 회색이
 // 살짝 섞인 뮤트 톤(L0.76, S0.20)으로 — 장난감이 아닌 데스크 오브제 인상.
-const hsl = (h) => hslHex(h, 0.20, 0.76);
+const hsl = (h) => hslHex(h, 0.18, 0.74);
 
 // 외곽선색: 같은 hue, 채도를 낮춰 차분하게(까만 두꺼운 선의 아동 만화 느낌 회피).
 const outlineOf = (h) => hslHex(h, 0.18, 0.40);
@@ -195,10 +195,10 @@ function blushGlow(x, y, r = 16) {
   const gid = `blush_${_blushSeq++}`;
   return (
     `<defs><radialGradient id="${gid}" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0.45" stop-color="${ROSE}" stop-opacity="0.26"/>` +
+    `<stop offset="0.45" stop-color="${ROSE}" stop-opacity="0.22"/>` +
     `<stop offset="1" stop-color="${ROSE}" stop-opacity="0"/></radialGradient></defs>` +
     `<circle cx="${x}" cy="${y}" r="${(r * 1.3).toFixed(1)}" fill="url(#${gid})"/>` +
-    `<circle cx="${x}" cy="${y}" r="${r}" fill="${ROSE}" opacity="0.22"/>`
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${ROSE}" opacity="0.16"/>`
   );
 }
 
@@ -586,8 +586,8 @@ function gaegul() {
     `<circle cx="312" cy="208" r="46" fill="${hsl(h)}" stroke="${ol}" stroke-width="8"/>` +
     `<circle cx="200" cy="208" r="20" fill="${INK}"/>` +
     `<circle cx="312" cy="208" r="20" fill="${INK}"/>` +
-    `<circle cx="207" cy="201" r="7" fill="#FFFFFF" opacity="0.92"/>` +
-    `<circle cx="319" cy="201" r="7" fill="#FFFFFF" opacity="0.92"/>` +
+    `<circle cx="207" cy="201" r="5" fill="#FFFFFF" opacity="0.9"/>` +
+    `<circle cx="319" cy="201" r="5" fill="#FFFFFF" opacity="0.9"/>` +
     mouth(256, 320, 60) +
     blushGlow(176, 312, 17) + blushGlow(336, 312, 17),
     bodyGrad('gaegul', h)
