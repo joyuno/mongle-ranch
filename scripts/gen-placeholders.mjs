@@ -20,12 +20,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'assets', 'characters');
 
 const INK = '#3B3129'; // 눈/입 공통 잉크색
+const ROSE = '#CC8A8F'; // 볼터치 공통 더스티 로즈 (24종 일관)
+
+// 볼터치/눈 radial 그라데이션 defs용 유일 id 카운터 (blush·blushGlow 공유).
+let _blushSeq = 0;
 
 // ── 공통 파츠 헬퍼 ──────────────────────────────────────────────────────────
 
+// 눈: 점눈 + 일관된 2점 하이라이트(큰 주 반짝 + 반대쪽 작은 캐치라이트).
+// 두 점 모두 또렷하게(opacity↑) — 24종 시선의 생기를 통일하는 결정타.
 const eye = (x, y, r = 12) =>
   `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}"/>` +
-  `<circle cx="${x + r * 0.34}" cy="${y - r * 0.34}" r="${(r * 0.3).toFixed(1)}" fill="#FFFFFF" opacity="0.92"/>`;
+  `<circle cx="${x + r * 0.34}" cy="${y - r * 0.34}" r="${(r * 0.32).toFixed(1)}" fill="#FFFFFF"/>` +
+  `<circle cx="${x - r * 0.30}" cy="${y + r * 0.36}" r="${(r * 0.15).toFixed(1)}" fill="#FFFFFF" opacity="0.78"/>`;
 
 // 졸린 점눈(부엉): 납작한 타원 + 윗눈꺼풀 선.
 const sleepyEye = (x, y) =>
@@ -37,8 +44,17 @@ const mouth = (cx, y, w = 18) =>
   `<path d="M ${cx - w / 2} ${y} Q ${cx} ${y + w * 0.55} ${cx + w / 2} ${y}" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`;
 
 // 볼터치는 성인향으로 더스티하게 — 쨍한 분홍/높은 불투명이 '유아' 인상의 1번 트리거.
-const blush = (x, y, r = 13) =>
-  `<circle cx="${x}" cy="${y}" r="${r}" fill="#CC8A8F" opacity="0.24"/>`;
+// 가장자리를 radial로 페이드(0.24→0)시켜 딱딱한 원 경계를 없앤다 — 신규 12종의
+// blushGlow와 동일한 결을 기존 12종에도 부여(24종 볼터치 일관).
+const blush = (x, y, r = 13) => {
+  const gid = `blush_${_blushSeq++}`;
+  return (
+    `<defs><radialGradient id="${gid}" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0.4" stop-color="${ROSE}" stop-opacity="0.24"/>` +
+    `<stop offset="1" stop-color="${ROSE}" stop-opacity="0"/></radialGradient></defs>` +
+    `<circle cx="${x}" cy="${y}" r="${(r * 1.35).toFixed(1)}" fill="url(#${gid})"/>`
+  );
+};
 
 const stub = (cx, cy, rx, ry, fill, ol, rot = 0) =>
   `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${ol}" stroke-width="7" ` +
@@ -87,11 +103,19 @@ function smoothStar(cx, cy, rOut, rIn, points) {
   return d + 'Z';
 }
 
+// 공통 접지 섀도(24종 일괄): 실루엣을 따라 부드러운 드롭섀도를 깔아 바닥에
+// 닿은 무게감 + 앰비언트 오클루전을 한 번에 준다. dy>blur 라 그림자가 발밑에
+// 고이고(접지감), 잉크색 22% 라 어른향으로 차분하다. 모서리 alpha는 보존
+// (librsvg feDropShadow는 투명 영역을 칠하지 않음 — 합성 테스트로 확인).
+const GROUND_SHADOW =
+  `<filter id="groundShadow" x="-25%" y="-25%" width="150%" height="150%">` +
+  `<feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="${INK}" flood-opacity="0.22"/></filter>`;
+
 function svgDoc(inner, defs = '') {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">` +
-    `<defs>${defs}</defs>` +
-    `<g stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`
+    `<defs>${GROUND_SHADOW}${defs}</defs>` +
+    `<g filter="url(#groundShadow)" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`
   );
 }
 
@@ -167,23 +191,20 @@ function cellShade(cx, bottomY, rx, h) {
 }
 
 // 볼터치 + radial 글로우 림: 볼 원 + 0.42→0 페이드 림(디지털 글로우).
-let _blushSeq = 0;
 function blushGlow(x, y, r = 16) {
   const gid = `blush_${_blushSeq++}`;
   return (
     `<defs><radialGradient id="${gid}" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0.45" stop-color="#CC8A8F" stop-opacity="0.26"/>` +
-    `<stop offset="1" stop-color="#CC8A8F" stop-opacity="0"/></radialGradient></defs>` +
+    `<stop offset="0.45" stop-color="${ROSE}" stop-opacity="0.26"/>` +
+    `<stop offset="1" stop-color="${ROSE}" stop-opacity="0"/></radialGradient></defs>` +
     `<circle cx="${x}" cy="${y}" r="${(r * 1.3).toFixed(1)}" fill="url(#${gid})"/>` +
-    `<circle cx="${x}" cy="${y}" r="${r}" fill="#CC8A8F" opacity="0.22"/>`
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${ROSE}" opacity="0.22"/>`
   );
 }
 
-// 눈(신규): 과한 반짝임(이중 하이라이트)은 '아기 눈' 인상이라 단일 작은
-// 하이라이트로 절제 — 더 차분하고 어른스러운 시선. r 기본 13.
-const eye2 = (x, y, r = 13) =>
-  `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}"/>` +
-  `<circle cx="${x + r * 0.30}" cy="${y - r * 0.34}" r="${(r * 0.24).toFixed(1)}" fill="#FFFFFF" opacity="0.82"/>`;
+// 눈(신규): 기존 eye와 동일한 2점 하이라이트 규칙을 따른다 — 신구 24종의
+// 시선을 하나의 손맛으로 통일. r 기본 13.
+const eye2 = (x, y, r = 13) => eye(x, y, r);
 
 // ── 캐릭터 12종 ─────────────────────────────────────────────────────────────
 

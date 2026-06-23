@@ -320,6 +320,20 @@ func _test_pack_import() -> void:
 	_eq(PackImport.list_user_packs().size(), before, "삭제 후 목록 원복")
 	# 번들(res://) 팩은 삭제 차단.
 	_eq(PackImport.delete_user_pack("res://data/quizzes/clickhouse-basics.json"), false, "번들 팩 삭제 차단")
+	# 파일명 정규화 + URL 파싱 + 중복 판정(번들 대조).
+	_eq(PackImport.storage_name("jlpt-n2-vocab-5.json"), "jlpt-n2-vocab-5.json", "storage_name 멱등")
+	_eq(PackImport.storage_name("data/quizzes/Foo Bar.yml"), "foo-bar.json", "storage_name 정규화(.yml→.json)")
+	_eq(PackImport.basename_of("https://raw.x/p/foo.json?ref=1"), "foo.json", "basename_of 쿼리 제거")
+	_eq(PackImport.github_contents_api("https://github.com/joyuno/mongle-ranch/tree/main/data/quizzes"),
+		"https://api.github.com/repos/joyuno/mongle-ranch/contents/data/quizzes?ref=main", "깃허브 폴더 URL→Contents API")
+	_eq(PackImport.github_contents_api("https://github.com/o/r/blob/dev/sub/p.json"),
+		"https://api.github.com/repos/o/r/contents/sub/p.json?ref=dev", "깃허브 파일 URL→Contents API")
+	_eq(PackImport.github_contents_api("https://github.com/o/r"),
+		"https://api.github.com/repos/o/r/contents", "깃허브 레포 루트→Contents API")
+	_eq(PackImport.github_contents_api("https://raw.githubusercontent.com/o/r/main/p.json"), "", "raw URL은 직접 GET(빈 API)")
+	_eq(PackImport.github_contents_api("https://example.com/x.json"), "", "비깃허브 URL은 직접 GET")
+	_truthy(PackImport.is_duplicate_name("clickhouse-basics.json"), "번들과 같은 파일명 → 중복 판정")
+	_truthy(not PackImport.is_duplicate_name("totally-new-pack-xyz.json"), "새 파일명 → 중복 아님")
 
 
 # -----------------------------------------------------------------------------

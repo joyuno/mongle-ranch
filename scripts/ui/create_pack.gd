@@ -12,7 +12,13 @@ var url_edit: LineEdit
 var status_label: Label
 var user_list_box: VBoxContainer
 var _http: HTTPRequest
-var _pending_url: String = ""
+var _http_mode: String = ""        # "listing"(폴더 목록) | "file"(팩 본문)
+var _url_queue: Array = []         # [{ name, url }] — 폴더 내 파일 큐
+var _seen_names: Dictionary = {}   # 중복 판정 집합(정규화 파일명)
+var _current_name: String = ""
+var _imported: int = 0
+var _skipped: int = 0
+var _failed: int = 0
 
 
 func _ready() -> void:
@@ -113,7 +119,7 @@ func _build_ui() -> void:
 	# ─ ③ URL에서 가져오기
 	var url_sec := _make_section(body, "collection", "③ URL에서 가져오기")
 	var url_note := Label.new()
-	url_note.text = "GitHub raw / Gist 등 공개 JSON·YAML 링크를 붙여넣으면 가져옵니다. (PC에서 만든 팩 옮기기 좋아요)"
+	url_note.text = "GitHub 폴더 URL을 넣으면 그 폴더의 모든 .json 팩을 한 번에 등록해요(중복 파일명은 자동 스킵). 단일 raw/blob 링크도 가능."
 	url_note.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
 	url_sec.add_child(url_note)
 	var url_row := HBoxContainer.new()
@@ -196,33 +202,94 @@ func _on_register() -> void:
 		_status("등록 실패: %s" % String(r.get("message", r.get("code", "알 수 없는 오류"))), true)
 
 
+# URL 입력: 깃허브 페이지/폴더면 Contents API로 폴더 내 모든 .json을 등록(중복 스킵),
+# raw 단일 파일이면 그것만 등록. JSON 경로를 끝까지 안 쳐도 폴더 URL만으로 동작.
 func _on_import_url() -> void:
 	var url := url_edit.text.strip_edges()
 	if not (url.begins_with("http://") or url.begins_with("https://")):
 		_status("http(s):// 로 시작하는 URL을 입력하세요.", true)
 		return
-	_pending_url = url
-	var err := _http.request(url)
-	if err != OK:
-		_status("요청 실패 (err=%d)" % err, true)
-		return
-	_status("가져오는 중…", false)
+	_url_queue.clear()
+	_seen_names = PackImport.existing_basenames()  # 번들+유저 기존 파일명(정규화)
+	_imported = 0
+	_skipped = 0
+	_failed = 0
+	var api := PackImport.github_contents_api(url)
+	if api.is_empty():
+		# raw 등 직접 단일 파일.
+		_http_mode = "file"
+		_current_name = PackImport.basename_of(url)
+		if _http.request(url) != OK:
+			_status("요청 실패", true)
+			return
+		_status("가져오는 중…", false)
+	else:
+		# 깃허브 폴더/파일 — Contents API(무인증)로 목록부터. User-Agent 필수.
+		_http_mode = "listing"
+		if _http.request(api, ["User-Agent: mongle-ranch", "Accept: application/vnd.github+json"]) != OK:
+			_status("요청 실패", true)
+			return
+		_status("깃허브에서 목록을 읽는 중…", false)
 
 
 func _on_http_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if result != HTTPRequest.RESULT_SUCCESS or code < 200 or code >= 300:
-		_status("가져오기 실패 (응답 %d)" % code, true)
+	var ok_http := result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300
+	if _http_mode == "listing":
+		if not ok_http:
+			_status("목록 가져오기 실패 (응답 %d) — 공개 저장소 URL인지 확인하세요." % code, true)
+			return
+		var parsed = JSON.parse_string(body.get_string_from_utf8())
+		if typeof(parsed) == TYPE_ARRAY:
+			for item in parsed:
+				if typeof(item) != TYPE_DICTIONARY or String(item.get("type", "")) != "file":
+					continue
+				var low := String(item.get("name", "")).to_lower()
+				if low.ends_with(".json") or low.ends_with(".yml") or low.ends_with(".yaml"):
+					_url_queue.append({ "name": String(item.get("name", "")), "url": String(item.get("download_url", "")) })
+			if _url_queue.is_empty():
+				_status("이 폴더에 .json/.yml 퀴즈팩이 없어요.", true)
+				return
+		elif typeof(parsed) == TYPE_DICTIONARY and parsed.has("download_url"):
+			_url_queue.append({ "name": String(parsed.get("name", "pack.json")), "url": String(parsed["download_url"]) })
+		else:
+			_status("응답을 해석할 수 없어요.", true)
+			return
+		_http_mode = "file"
+		_process_next()
 		return
-	var text := body.get_string_from_utf8()
-	var r := PackImport.import_raw(text, _pending_url)
-	if bool(r.get("ok", false)):
-		Sfx.play("levelup")
-		url_edit.text = ""
-		_status("'%s' 문제집을 가져왔어요!" % String(r.get("title", "")), false)
-		_refresh_user_list()
+	# _http_mode == "file": body = 팩 본문. 결과 누적 후 다음 항목.
+	if not ok_http:
+		_failed += 1
 	else:
-		Sfx.play("wrong")
-		_status("가져오기 실패: %s" % String(r.get("message", r.get("code", ""))), true)
+		var r := PackImport.import_raw(body.get_string_from_utf8(), _current_name)
+		if bool(r.get("ok", false)):
+			_imported += 1
+		elif bool(r.get("skipped", false)):
+			_skipped += 1
+		else:
+			_failed += 1
+	_process_next()
+
+
+# 큐의 다음 파일을 중복(파일명) 스킵하며 처리. 비면 요약 표시.
+func _process_next() -> void:
+	while not _url_queue.is_empty():
+		var item: Dictionary = _url_queue.pop_front()
+		var key := PackImport.storage_name(String(item.get("name", "")))
+		if _seen_names.has(key):
+			_skipped += 1
+			continue
+		_seen_names[key] = true
+		_current_name = String(item.get("name", ""))
+		if _http.request(String(item.get("url", ""))) != OK:
+			_failed += 1
+			continue
+		return  # 응답 대기
+	if _imported > 0:
+		Sfx.play("levelup")
+	url_edit.text = ""
+	_status("등록 %d · 중복 스킵 %d · 실패 %d" % [_imported, _skipped, _failed], _failed > 0)
+	_refresh_user_list()
 
 
 func _on_delete(path: String) -> void:

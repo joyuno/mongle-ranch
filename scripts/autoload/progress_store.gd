@@ -139,6 +139,10 @@ func is_timer_enabled() -> bool:
 	return bool(progress.get("timerEnabled", true))
 
 
+func is_figures_enabled() -> bool:
+	return bool(progress.get("figuresEnabled", true))  # 구조 시각화 — 기본 on(제로베이스)
+
+
 func get_font_size_scale() -> int:
 	return int(progress.get("fontSizeScale", 1))
 
@@ -624,6 +628,11 @@ func set_timer_enabled(enabled: bool) -> void:
 	progress["timerEnabled"] = enabled
 	_persist()
 	timer_enabled_changed.emit(enabled)
+
+
+func set_figures_enabled(enabled: bool) -> void:
+	progress["figuresEnabled"] = enabled
+	_persist()
 
 
 func set_font_size_scale(scale: int) -> void:

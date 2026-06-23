@@ -35,15 +35,22 @@ var ladder_labels: Array[Label] = []
 var review_progress_label: Label
 var timer_bar: ProgressBar
 var passage_panel: PanelContainer
-var passage_label: Label
-var question_label: Label
+var passage_label: RichTextLabel   # 드래그 복사 가능(RichTextLabel + selection_enabled)
+var question_label: RichTextLabel
 var choices_box: VBoxContainer
 var glossary_box: VBoxContainer
 
+# 구조 시각화(figure 필드) — 제로베이스 학습 지원, 토글 on/off.
+var figure_panel: PanelContainer
+var figure_view: FigureView
+var figure_toggle: CheckButton
+var figure_caption: Label
+var _current_figure: String = ""
+
 var feedback_panel: PanelContainer
 var feedback_title: Label
-var feedback_explanation: Label
-var feedback_answer: Label
+var feedback_explanation: RichTextLabel
+var feedback_answer: RichTextLabel
 var feedback_bonus_box: VBoxContainer
 var cash_out_btn: Button
 var advance_btn: Button
@@ -396,17 +403,15 @@ func _build_session_ui() -> void:
 	var passage_scroll := ScrollContainer.new()
 	passage_scroll.custom_minimum_size.y = 140
 	passage_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	passage_label = Label.new()
-	passage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	passage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	passage_label = _selectable_text(17, ThemeSetup.C_TEXT)
 	passage_scroll.add_child(passage_label)
 	passage_panel.add_child(passage_scroll)
 	session_root.add_child(passage_panel)
 
-	question_label = Label.new()
-	question_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	question_label.add_theme_font_size_override("font_size", 22)
+	question_label = _selectable_text(22, ThemeSetup.C_TEXT)
 	session_root.add_child(question_label)
+
+	_build_figure_panel()  # 질문 아래 구조 시각화 + 토글
 
 	# 용어 카드 — 질문 아래, 보기 위. 문항의 glossary 필드로 채움(없으면 숨김).
 	glossary_box = VBoxContainer.new()
@@ -423,6 +428,66 @@ func _build_session_ui() -> void:
 	_build_result_panel()
 
 
+# 드래그로 선택·복사 가능한 읽기전용 텍스트(RichTextLabel, bbcode off — 프로젝트 규칙).
+func _selectable_text(font_size: int, color: Color) -> RichTextLabel:
+	var r := RichTextLabel.new()
+	r.bbcode_enabled = false
+	r.selection_enabled = true       # 마우스 드래그 선택
+	r.context_menu_enabled = true    # 우클릭 복사 메뉴
+	r.shortcut_keys_enabled = true   # Ctrl+C 복사
+	r.fit_content = true
+	r.scroll_active = false
+	r.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r.add_theme_font_size_override("normal_font_size", font_size)
+	r.add_theme_color_override("default_color", color)
+	return r
+
+
+# 구조 시각화 패널 — 질문 아래. figure 필드가 있으면 단위격자 등을 그리고 토글로 on/off.
+func _build_figure_panel() -> void:
+	figure_panel = PanelContainer.new()
+	figure_panel.visible = false
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	figure_panel.add_child(box)
+	var header := HBoxContainer.new()
+	var title := Icons.labeled("eye", "구조 그림 (제로베이스 도움)", ThemeSetup.C_TEXT, 16)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	figure_toggle = CheckButton.new()
+	figure_toggle.text = "보기"
+	figure_toggle.button_pressed = ProgressStore.is_figures_enabled()
+	figure_toggle.toggled.connect(_on_figure_toggled)
+	header.add_child(figure_toggle)
+	box.add_child(header)
+	figure_view = FigureView.new()
+	figure_view.custom_minimum_size = Vector2(0, 240)
+	box.add_child(figure_view)
+	figure_caption = Label.new()
+	figure_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	figure_caption.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
+	box.add_child(figure_caption)
+	session_root.add_child(figure_panel)
+
+
+func _update_figure() -> void:
+	var has := not _current_figure.is_empty() and FigureView.is_supported(_current_figure)
+	figure_panel.visible = has  # figure 있으면 패널(토글 포함) 노출
+	var show := has and ProgressStore.is_figures_enabled()
+	figure_view.visible = show
+	figure_caption.visible = show
+	if show:
+		figure_view.set_figure(_current_figure)
+		figure_caption.text = FigureView.caption_for(_current_figure)
+
+
+func _on_figure_toggled(pressed: bool) -> void:
+	Sfx.play("click")
+	ProgressStore.set_figures_enabled(pressed)
+	_update_figure()
+
+
 func _build_feedback_panel() -> void:
 	feedback_panel = PanelContainer.new()
 	feedback_panel.visible = false
@@ -434,15 +499,11 @@ func _build_feedback_panel() -> void:
 	feedback_title.add_theme_font_size_override("font_size", 20)
 	box.add_child(feedback_title)
 
-	feedback_answer = Label.new()
-	feedback_answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	feedback_answer.add_theme_color_override("font_color", ThemeSetup.C_OK)
+	feedback_answer = _selectable_text(16, ThemeSetup.C_OK)
 	feedback_answer.visible = false
 	box.add_child(feedback_answer)
 
-	feedback_explanation = Label.new()
-	feedback_explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	feedback_explanation.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
+	feedback_explanation = _selectable_text(16, ThemeSetup.C_MUTED)
 	box.add_child(feedback_explanation)
 
 	feedback_bonus_box = VBoxContainer.new()
@@ -545,6 +606,8 @@ func _render_question(q: Dictionary) -> void:
 	passage_label.text = passage
 
 	question_label.text = String(q.get("q", ""))
+	_current_figure = String(q.get("figure", ""))
+	_update_figure()
 	_render_glossary(q.get("glossary", []))
 
 	_clear_children(choices_box)

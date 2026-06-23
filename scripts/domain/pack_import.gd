@@ -8,11 +8,86 @@ class_name PackImport
 extends RefCounted
 
 const USER_DIR := "user://quizzes"
+const BUNDLED_DIR := "res://data/quizzes"
 
 
 static func _ensure_dir() -> void:
 	if not DirAccess.dir_exists_absolute(USER_DIR):
 		DirAccess.make_dir_recursive_absolute(USER_DIR)
+
+
+# 소스 파일명 → 저장 파일명(.json 고정, ASCII slug). 멱등: jlpt-n2-vocab-5.json → 동일.
+# 중복 판정·저장 모두 이 정규화 이름을 쓴다.
+static func storage_name(source_name: String) -> String:
+	var base := source_name.get_file()
+	var dot := base.rfind(".")
+	if dot > 0:
+		base = base.substr(0, dot)
+	return slugify(base) + ".json"
+
+
+# URL/경로의 마지막 경로 세그먼트(파일명). 쿼리스트링 제거.
+static func basename_of(url: String) -> String:
+	var u := url.split("?")[0]
+	return u.get_file()
+
+
+# 이미 등록된(번들 res:// + 유저 user://) 팩 파일명 집합(정규화). 중복 판정용.
+static func existing_basenames() -> Dictionary:
+	var seen := {}
+	for d in [BUNDLED_DIR, USER_DIR]:
+		var dir := DirAccess.open(d)
+		if dir == null:
+			continue
+		for fname in dir.get_files():
+			var low := fname.to_lower()
+			if low.ends_with(".json") or low.ends_with(".yml") or low.ends_with(".yaml"):
+				seen[storage_name(fname)] = true
+	return seen
+
+
+static func is_duplicate_name(source_name: String) -> bool:
+	return existing_basenames().has(storage_name(source_name))
+
+
+# github.com 페이지/폴더 URL → GitHub Contents API URL(무인증 공개)로 변환.
+# 폴더면 파일 배열, 단일 파일이면 객체를 돌려준다(download_url 포함). 토큰 불필요.
+# 이미 raw URL(raw.githubusercontent.com)이거나 깃허브가 아니면 "" 반환 → 직접 GET.
+static func github_contents_api(url: String) -> String:
+	var u := url.strip_edges()
+	if u.contains("raw.githubusercontent.com"):
+		return ""  # 이미 raw 단일 파일 — 직접 받는다
+	if u.begins_with("https://api.github.com/"):
+		return u
+	var g := _parse_github(u)
+	if g.is_empty():
+		return ""
+	var api := "https://api.github.com/repos/%s/%s/contents" % [g["owner"], g["repo"]]
+	if not String(g["path"]).is_empty():
+		api += "/" + String(g["path"])
+	if not String(g["branch"]).is_empty():
+		api += "?ref=" + String(g["branch"])
+	return api
+
+
+# github.com/{owner}/{repo}[/tree|blob/{branch}/{path...}] → { owner, repo, branch, path }.
+static func _parse_github(url: String) -> Dictionary:
+	var marker := "github.com/"
+	var i := url.find(marker)
+	if i < 0:
+		return {}
+	var rest := url.substr(i + marker.length()).split("?")[0].trim_suffix("/")
+	var parts := rest.split("/")
+	if parts.size() < 2:
+		return {}
+	var owner := parts[0]
+	var repo := parts[1].trim_suffix(".git")
+	var branch := ""
+	var path := ""
+	if parts.size() >= 4 and (parts[2] == "tree" or parts[2] == "blob"):
+		branch = parts[3]
+		path = "/".join(parts.slice(4))
+	return { "owner": owner, "repo": repo, "branch": branch, "path": path }
 
 
 # 챗봇 출력의 흔한 오염 제거: 코드펜스·앞뒤 산문 제거, 스마트따옴표/NBSP 정규화,
@@ -55,9 +130,12 @@ static func import_text(text: String) -> Dictionary:
 	return _store(parsed["pack"])
 
 
-# URL/파일 원문 + 확장자 힌트로 등록(YAML도 허용). 저장은 항상 정규 JSON.
-static func import_raw(raw: String, ext_hint: String) -> Dictionary:
-	var low := ext_hint.to_lower()
+# URL/파일 원문 + 소스 파일명으로 등록(YAML도 허용). 저장은 항상 정규 JSON.
+# source_name이 있으면 그 파일명으로 저장(중복 판정 기준)하고, 이미 있으면 스킵한다.
+static func import_raw(raw: String, source_name: String = "") -> Dictionary:
+	if not source_name.is_empty() and is_duplicate_name(source_name):
+		return { "ok": false, "code": "DUP", "message": "이미 등록된 파일명", "skipped": true }
+	var low := source_name.to_lower()
 	var parsed: Dictionary
 	if low.ends_with("yml") or low.ends_with("yaml"):
 		parsed = PackParser.parse_yaml_string(raw)
@@ -68,13 +146,14 @@ static func import_raw(raw: String, ext_hint: String) -> Dictionary:
 		parsed = PackParser.parse_string(normalized)
 	if not parsed.get("ok", false):
 		return parsed
-	return _store(parsed["pack"])
+	var fname := storage_name(source_name) if not source_name.is_empty() else ""
+	return _store(parsed["pack"], fname)
 
 
-static func _store(pack: Dictionary) -> Dictionary:
+static func _store(pack: Dictionary, filename: String = "") -> Dictionary:
 	_ensure_dir()
 	var title := String((pack.get("meta", {}) as Dictionary).get("title", "pack"))
-	var base := slugify(title)
+	var base := filename.trim_suffix(".json") if not filename.is_empty() else slugify(title)
 	var path := "%s/%s.json" % [USER_DIR, base]
 	var n := 2
 	while FileAccess.file_exists(path):

@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "title": "반도체 - 결정 구조 기초",
+    "version": "1.0.0",
+    "default_time": 40,
+    "tags": ["semiconductor", "재료", "결정구조", "crystal"]
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "면심입방(FCC) 단위격자 1개에 포함된 유효 원자 개수는?",
+      "choices": ["1개", "2개", "4개", "6개"],
+      "answer": 2,
+      "figure": "fcc",
+      "explanation": "코너 8개 × 1/8 = 1, 면 6개 × 1/2 = 3 → 합 4개. 코너 원자는 8개 격자가 공유하고, 면 원자는 2개 격자가 공유한다."
+    },
+    {
+      "type": "mcq",
+      "q": "체심입방(BCC) 단위격자에 포함된 유효 원자 개수는?",
+      "choices": ["1개", "2개", "4개", "8개"],
+      "answer": 1,
+      "figure": "bcc",
+      "explanation": "코너 8개 × 1/8 = 1, 중심 1개는 온전히 포함 → 2개. (예: α-Fe, W)"
+    },
+    {
+      "type": "mcq",
+      "q": "단순입방(SC) 단위격자에 포함된 유효 원자 개수는?",
+      "choices": ["1개", "2개", "3개", "4개"],
+      "answer": 0,
+      "figure": "sc",
+      "explanation": "코너 8개 × 1/8 = 1개. 가장 단순한 격자(예: α-Po)."
+    },
+    {
+      "type": "mcq",
+      "q": "실리콘(Si)·게르마늄(Ge)이 갖는 다이아몬드 구조의 단위격자당 유효 원자 개수는?",
+      "choices": ["4개", "6개", "8개", "12개"],
+      "answer": 2,
+      "figure": "diamond",
+      "explanation": "FCC 격자(유효 4개) + 내부 사면체 자리 4개 = 8개. 반도체 소자의 기본 결정 구조."
+    },
+    {
+      "type": "ox",
+      "q": "FCC는 BCC보다 단위격자당 유효 원자 수가 더 많다.",
+      "answer": true,
+      "figure": "fcc",
+      "explanation": "FCC 4개 > BCC 2개. FCC는 최조밀 충진(74%) 구조다."
+    },
+    {
+      "type": "mcq",
+      "q": "육방조밀(HCP) 구조의 원자 충진율(packing factor)에 가장 가까운 값은?",
+      "choices": ["52%", "68%", "74%", "100%"],
+      "answer": 2,
+      "figure": "hcp",
+      "explanation": "HCP와 FCC 모두 최조밀 충진 구조로 충진율 74%. SC는 52%, BCC는 68%."
+    }
+  ]
+}
