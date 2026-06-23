@@ -881,6 +881,41 @@ function assertNoBannedTerms() {
   console.log(`✓ 금지어 0 (id·모티프 ${Object.keys(CHARACTERS).length}종 × ${BANNED.length}어 대조)`);
 }
 
+// (b1) 입체 라이팅 오버레이 — 좌상단 광원 → 우하단 그림자(한 방향, soft-light).
+// 납작한 단색 바디에 볼륨/형태를 부여해 '도형'을 '렌더된 입체'로. 24종 공통 광원 = 응집.
+// 형태 명암(좌상단 밝음 → 우하단 어두움). 단색 바디에 명확한 볼륨을 준다.
+const FORM_OVERLAY =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs>` +
+  `<linearGradient id="f" x1="0.14" y1="0.08" x2="0.86" y2="0.96">` +
+  `<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.46"/>` +
+  `<stop offset="0.4" stop-color="#FFFFFF" stop-opacity="0"/>` +
+  `<stop offset="0.58" stop-color="#2A2018" stop-opacity="0"/>` +
+  `<stop offset="1" stop-color="#2A2018" stop-opacity="0.44"/>` +
+  `</linearGradient></defs><rect width="512" height="512" fill="url(#f)"/></svg>`;
+// 좌상단 광택(비닐 피규어 하이라이트). screen 합성으로 또렷한 반짝.
+const SPEC_OVERLAY =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs>` +
+  `<radialGradient id="s" cx="0.34" cy="0.26" r="0.40">` +
+  `<stop offset="0" stop-color="#FFFFFF" stop-opacity="0.42"/>` +
+  `<stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>` +
+  `</radialGradient></defs><rect width="512" height="512" fill="url(#s)"/></svg>`;
+
+// SVG → 512² 래스터 + 입체 라이팅(형태 명암 + 광택) + 원본 알파 마스크 복원(실루엣 불변) → PNG.
+async function renderSprite(svg) {
+  const base = await sharp(Buffer.from(svg)).ensureAlpha().png().toBuffer();
+  const lit = await sharp(base)
+    .composite([
+      { input: Buffer.from(FORM_OVERLAY), blend: 'soft-light' },
+      { input: Buffer.from(SPEC_OVERLAY), blend: 'screen' },
+    ])
+    .png().toBuffer();
+  // dest-in: 라이팅 결과를 원본 스프라이트 알파로 마스킹 → 실루엣·모서리 원복.
+  return await sharp(lit)
+    .composite([{ input: base, blend: 'dest-in' }])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 // (b) 컨택트시트: 24종 PNG를 6×4 그리드 한 장으로 합성 (육안 중복 확인용).
 async function buildContactSheet() {
   const ids = Object.keys(CHARACTERS);
@@ -889,7 +924,7 @@ async function buildContactSheet() {
   const composites = [];
   for (let i = 0; i < ids.length; i++) {
     const svg = CHARACTERS[ids[i]]();
-    const thumb = await sharp(Buffer.from(svg))
+    const thumb = await sharp(await renderSprite(svg))
       .resize(cell - pad * 2, cell - pad * 2, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png().toBuffer();
     composites.push({
@@ -925,7 +960,7 @@ async function main() {
   let bad = 0;
   for (const id of ids) {
     const svg = CHARACTERS[id]();
-    const buf = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer();
+    const buf = await renderSprite(svg);
     const file = join(OUT_DIR, `${id}.png`);
     await writeFile(file, buf);
 
