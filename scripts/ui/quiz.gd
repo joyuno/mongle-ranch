@@ -28,6 +28,7 @@ var pack_status_label: Label
 
 # ─ (B) 사다리 세션
 var session_root: VBoxContainer
+var session_scroll: ScrollContainer  # session_root를 감싸 해설이 길면 세로 스크롤
 var session_title_label: Label
 var ladder_bar: HBoxContainer
 var ladder_cells: Array[PanelContainer] = []
@@ -90,7 +91,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if session_root == null or not session_root.visible:
+	if session_scroll == null or not session_scroll.visible:
 		return
 	if PackStore.phase != "IN_QUESTION" or not ProgressStore.is_timer_enabled():
 		return
@@ -104,7 +105,7 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if session_root == null or not session_root.visible:
+	if session_scroll == null or not session_scroll.visible:
 		return
 	if event.is_action_pressed("ui_skip"):
 		if PackStore.phase == "FEEDBACK":
@@ -437,11 +438,16 @@ func _show_pack_status(msg: String) -> void:
 # (B) 사다리 세션 UI 빌드
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_session_ui() -> void:
+	# 세션 화면 전체를 스크롤로 감싼다 — 해설/보기가 창보다 길면 세로 스크롤.
+	session_scroll = ScrollContainer.new()
+	session_scroll.visible = false
+	session_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(session_scroll)
+	_anchor_column(session_scroll, COLUMN_MARGIN_X, COLUMN_MARGIN_Y)
 	session_root = VBoxContainer.new()
 	session_root.add_theme_constant_override("separation", 12)
-	session_root.visible = false
-	add_child(session_root)
-	_anchor_column(session_root, COLUMN_MARGIN_X, COLUMN_MARGIN_Y)
+	session_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	session_scroll.add_child(session_root)
 
 	session_title_label = Label.new()
 	session_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -659,14 +665,14 @@ func _build_result_panel() -> void:
 # 화면 전환 / 렌더링
 # ─────────────────────────────────────────────────────────────────────────────
 func _show_pack_select() -> void:
-	session_root.visible = false
+	session_scroll.visible = false
 	pack_root.visible = true
 	_populate_pack_list()
 
 
 func _enter_session() -> void:
 	pack_root.visible = false
-	session_root.visible = true
+	session_scroll.visible = true
 	feedback_panel.visible = false
 	result_panel.visible = false
 	var is_review := PackStore.is_review_mode
