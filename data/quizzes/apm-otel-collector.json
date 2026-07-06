@@ -1,5 +1,6 @@
 {
   "meta": {
+    "category": "observability",
     "title": "APM 2 - OTel 계측·Collector·전파",
     "version": "1.1.0",
     "default_time": 35,

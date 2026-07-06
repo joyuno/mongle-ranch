@@ -1,5 +1,6 @@
 {
   "meta": {
+    "category": "semiconductor",
     "title": "반도체 신뢰성·불량분석 2",
     "version": "1.0.0",
     "default_time": 45,

@@ -1,5 +1,6 @@
 {
   "meta": {
+    "category": "semiconductor",
     "title": "메모리반도체(DRAM·NAND) 3",
     "version": "1.0.0",
     "default_time": 45,

@@ -1,5 +1,6 @@
 {
   "meta": {
+    "category": "clickhouse",
     "title": "ClickHouse Basics",
     "version": "0.1.0",
     "default_time": 30,

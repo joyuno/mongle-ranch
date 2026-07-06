@@ -1,5 +1,6 @@
 {
   "meta": {
+    "category": "observability",
     "title": "RUM 1 - 이벤트 모델·SDK·전송",
     "version": "1.1.0",
     "default_time": 35,
