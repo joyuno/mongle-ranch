@@ -1,0 +1,560 @@
+{
+  "meta": {
+    "title": "Linux — 프로세스·네트워크·트러블슈팅",
+    "version": "1.0.0",
+    "default_time": 40,
+    "tags": ["practical", "reference", "linux"],
+    "category": "linux"
+  },
+  "questions": [
+    {
+      "type": "mcq",
+      "q": "`ps aux` 에서 어떤 프로세스가 STAT 열에 `D` 로 오래 머물러 있고 `kill -9` 를 보내도 죽지 않는다. 가장 정확한 해석은?",
+      "choices": [
+        "D는 좀비 상태라 부모가 wait 하기 전엔 절대 안 죽는다",
+        "D는 중단 불가능한 슬립(uninterruptible sleep)으로 대개 I/O 완료를 기다리는 중이며, 커널이 시그널을 전달하지 못해 I/O가 끝나야 반응한다",
+        "D는 디버거에 붙잡힌 상태라 detach 해야만 죽는다",
+        "D는 우선순위가 최고(-20)라 시그널이 무시된다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "D 상태｜uninterruptible sleep｜커널 I/O 완료를 기다리며 시그널로 깨울 수 없는 상태",
+        "STAT｜process state｜ps가 보여주는 프로세스 상태 코드(R·S·D·Z·T 등)",
+        "iowait｜｜CPU가 디스크·네트워크 I/O 완료를 기다리는 시간"
+      ],
+      "explanation": "`D`(uninterruptible sleep)는 보통 디스크·NFS·스토리지 I/O 완료를 기다리며 커널 임계 구간에 들어가 있어 시그널을 즉시 받지 못한다. 따라서 SIGKILL조차 I/O가 끝나거나 타임아웃될 때까지 보류되며, 근본 원인(느린 디스크·끊긴 NFS 서버)을 `iostat -x`나 `dmesg`로 찾아야 한다. 「좀비라 안 죽는다」는 좀비는 `Z` 상태로 다른 항목이고, 「디버거에 붙잡힘」은 `T`(traced/stopped) 상태이며, 「우선순위 최고라 무시」는 nice 값과 시그널 전달을 혼동한 설명이다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "CPU를 가장 많이 먹는 프로세스 상위 10개를 한 줄로 뽑는 관용구로 적절한 것은?",
+      "choices": [
+        "`ps aux --sort=-%cpu | head -n 11`",
+        "`ps aux | sort | head`",
+        "`top -n 10`",
+        "`ps -e | grep cpu`"
+      ],
+      "answer": 0,
+      "glossary": [
+        "--sort｜｜ps 출력을 지정한 필드로 정렬(앞의 - 는 내림차순)",
+        "%cpu｜｜프로세스의 CPU 점유율 필드",
+        "head -n 11｜｜헤더 1줄 + 상위 10개를 함께 보기 위한 개수"
+      ],
+      "explanation": "`ps aux --sort=-%cpu`는 CPU 점유율 내림차순으로 정렬하며, 헤더 한 줄을 포함해 `head -n 11`로 상위 10개를 본다(메모리 기준은 `--sort=-%mem`). 「`sort | head`」는 문자열 사전순 정렬이라 숫자 상위와 무관하고, 「`top -n 10`」의 `-n`은 정렬 개수가 아니라 갱신 횟수(10회 후 종료)이며, 「`grep cpu`」는 명령줄에 'cpu' 문자열이 든 줄만 걸러 목적과 다르다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "대화형 `top` 을 실행한 상태에서 메모리 사용량이 큰 순으로 프로세스를 정렬해 보려면?",
+      "choices": [
+        "`k` 를 누른다",
+        "`q` 를 누른다",
+        "`M`(대문자) 를 누른다",
+        "`r` 를 누른다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "top 대화형 키｜｜실행 중 단축키로 정렬·필터를 바꾸는 기능",
+        "M / P｜｜메모리(%MEM) / CPU(%CPU) 기준 정렬 단축키",
+        "RES｜resident memory｜실제 물리 메모리 점유량"
+      ],
+      "explanation": "top 실행 중 대문자 `M`은 메모리(%MEM) 기준, `P`는 CPU(%CPU) 기준으로 정렬한다. 「`k`」는 kill(PID 입력 후 시그널 전송), 「`q`」는 종료, 「`r`」는 renice(우선순위 변경)라서 정렬과 무관하다. 참고로 `1`을 누르면 코어별 사용률을 개별로 펼쳐 볼 수 있다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`top` 대신 `htop` 을 선호하는 실무적 이유로 가장 정확한 것은?",
+      "choices": [
+        "htop은 root 권한 없이도 남의 프로세스를 강제 종료할 수 있다",
+        "htop은 CPU·메모리를 top보다 적게 쓰도록 커널을 튜닝한다",
+        "코어별 막대 그래프·프로세스 트리·마우스와 F키로 검색/필터/시그널 전송을 대화형으로 제공한다",
+        "htop은 원격 서버의 프로세스를 네트워크로 자동 수집한다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "htop｜｜색상·트리·스크롤을 지원하는 대화형 프로세스 뷰어",
+        "프로세스 트리｜F5/tree view｜부모-자식 관계를 계층으로 표시",
+        "F키 메뉴｜｜F3 검색·F4 필터·F9 kill 등 기능키 조작"
+      ],
+      "explanation": "htop은 코어별 사용률 막대, 프로세스 트리(F5), F3 검색·F4 필터·F9 시그널 전송, 가로/세로 스크롤 등 대화성을 크게 개선했다. 다만 권한 모델은 top과 같아 「root 없이 남의 프로세스 종료」는 불가능하고, 커널을 튜닝하지도(오히려 별도 프로세스), 원격 수집 기능도 없다. 표시가 더 풍부할 뿐 측정 원천은 동일한 `/proc`이다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "포그라운드 실행 중인 명령을 `Ctrl+Z` 로 멈춘 뒤 백그라운드에서 계속 돌리려면?",
+      "choices": [
+        "`Ctrl+Z` 는 프로세스를 종료하므로 다시 실행해야 한다",
+        "`fg` 를 입력한다",
+        "`bg` 를 입력해 중지된 잡을 백그라운드에서 재개한다",
+        "`kill -CONT` 만 보내면 포그라운드로 돌아온다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "Ctrl+Z｜SIGTSTP｜포그라운드 잡을 일시 중지시키는 시그널",
+        "bg / fg｜｜중지된 잡을 백그라운드/포그라운드에서 재개",
+        "잡 제어｜job control｜셸이 여러 잡을 중지·재개·전환하는 기능"
+      ],
+      "explanation": "`Ctrl+Z`는 SIGTSTP를 보내 프로세스를 종료가 아니라 '중지(stopped)' 상태로 만든다. 이어서 `bg`를 입력하면 그 잡이 백그라운드에서 실행을 재개하고(SIGCONT), `fg`는 다시 포그라운드로 가져온다. 「종료된다」는 SIGTSTP를 SIGINT/SIGKILL과 혼동한 것이고, 「`fg`」는 포그라운드 복귀라 질문과 반대이며, `kill -CONT`는 재개는 시키지만 자동으로 포그라운드로 되돌리지는 않는다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "SSH 세션이 끊겨도 계속 돌아야 하는 배치 작업을 시작하려 한다. `myjob &` 만으로는 부족한 이유와 해법으로 옳은 것은?",
+      "choices": [
+        "`&` 만 붙여도 로그아웃과 완전히 무관하므로 추가 조치가 필요 없다",
+        "`&` 는 표준출력을 자동으로 /dev/null 로 보내므로 로그가 남지 않아 문제다",
+        "`myjob &` 는 즉시 root 권한을 잃으므로 `sudo` 를 앞에 붙여야 한다",
+        "터미널이 닫히면 셸이 자식에게 SIGHUP을 보내 죽을 수 있어, `nohup myjob &` 로 SIGHUP을 무시하게 한다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "SIGHUP｜signal 1｜제어 터미널 종료 시 전달되는 hangup 시그널",
+        "nohup｜no hangup｜SIGHUP을 무시하고 출력을 nohup.out으로 저장",
+        "제어 터미널｜controlling terminal｜셸 잡이 연결된 tty"
+      ],
+      "explanation": "터미널(SSH 세션)이 닫히면 셸이 그 잡들에게 SIGHUP을 보내 종료시킬 수 있다. `nohup`은 SIGHUP을 무시하도록 감싸고 tty가 사라져도 출력을 `nohup.out`(또는 지정 파일)으로 보내 로그를 남긴다. 더 견고하게는 tmux/screen이나 `systemd-run`을 쓴다. 「무관하다」는 틀렸고, `&`는 권한을 잃게 하지도(sudo 무관), 출력을 자동으로 /dev/null로 보내지도 않는다(리다이렉션은 명시해야 함).",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`nohup` 없이 이미 `myjob &` 로 실행해 버린 백그라운드 잡을, 지금 로그아웃해도 안 죽도록 뒤늦게 보호하려면?",
+      "choices": [
+        "이미 늦었으므로 죽여서 nohup으로 다시 시작하는 수밖에 없다",
+        "`disown -h %1` 로 해당 잡을 SIGHUP 대상에서 제외한다",
+        "`bg %1` 을 한 번 더 실행한다",
+        "`kill -HUP %1` 을 미리 보내 둔다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "disown｜｜잡을 셸의 잡 테이블에서 제거해 SIGHUP을 안 보내게 함",
+        "-h 옵션｜disown -h｜잡은 테이블에 두되 SIGHUP만 보내지 않게 표시",
+        "%1｜job spec｜jobs 목록의 1번 잡을 가리키는 표기"
+      ],
+      "explanation": "`disown -h %1`은 실행 중인 잡을 종료하지 않고 셸의 hangup 대상에서만 빼서, 로그아웃 시 SIGHUP을 받지 않게 한다(옵션 없는 `disown`은 잡 테이블에서 완전히 제거). 이미 실행된 프로세스를 죽였다 다시 시작할 필요가 없다는 점이 nohup과의 실무적 차이다. 「`bg`」는 재개용이라 무관하고, 「`kill -HUP`을 미리」는 오히려 지금 죽이는 행위다. 다만 disown은 출력 리다이렉션까지 옮겨주지는 않는다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "ox",
+      "q": "많은 데몬(nginx·rsyslog 등)에서 `kill -HUP <PID>`(SIGHUP)는 프로세스를 죽이라는 뜻이 아니라 관례적으로 설정 파일을 재읽기하라는 신호로 쓰인다.",
+      "answer": true,
+      "glossary": [
+        "SIGHUP｜signal 1｜원래 터미널 hangup, 데몬에선 흔히 reload 관례",
+        "graceful reload｜｜프로세스 재시작 없이 설정을 다시 읽는 것"
+      ],
+      "explanation": "터미널이 없는 데몬에게 SIGHUP은 원래 의미가 무의미하므로, 많은 서버 프로그램이 이를 '설정 재적용(reload)' 신호로 재해석하도록 구현했다(예: `nginx -s reload`가 내부적으로 HUP 처리, sshd·rsyslog 등도 HUP에 설정 재읽기). 다만 모든 프로그램이 그런 것은 아니므로 문서를 확인해야 하며, systemd 환경에서는 `systemctl reload`가 각 유닛에 정의된 ExecReload를 호출하는 표준 방법이다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`pkill -f deploy` 처럼 `-f` 를 붙여 프로세스를 죽일 때의 대표적 함정은?",
+      "choices": [
+        "-f 는 강제(force) 종료라 SIGKILL이 자동 전송된다",
+        "-f 는 부모 프로세스만 종료하고 자식은 남긴다",
+        "-f 는 파일을 잠근(lock) 프로세스만 죽인다",
+        "-f 는 전체 명령줄(인자 포함)을 매칭하므로 `vim deploy.sh` 편집기나 `grep deploy` 같은 무관한 프로세스까지 잡을 수 있다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "pkill｜｜이름·패턴으로 프로세스에 시그널을 보내는 명령",
+        "-f 옵션｜--full｜프로세스 이름이 아닌 전체 명령줄로 매칭",
+        "오탐｜false match｜의도치 않은 프로세스가 패턴에 걸리는 것"
+      ],
+      "explanation": "`-f`는 프로세스 이름만이 아니라 인자를 포함한 전체 명령줄로 정규식 매칭하므로, `deploy`라는 문자열이 인자·경로에 들어간 편집기·로그뷰어·다른 스크립트까지 걸려 함께 죽일 수 있다. 실행 전 `pgrep -af deploy`로 대상을 먼저 확인하는 것이 안전하다. 「-f=강제」는 시그널 세기와 무관하고(강제는 `-9`), 파일 잠금이나 부모/자식 구분과도 관계가 없다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "ox",
+      "q": "`kill <PID>` 처럼 시그널을 지정하지 않으면 기본으로 SIGKILL(9)이 전송된다.",
+      "answer": false,
+      "glossary": [
+        "kill 기본 시그널｜｜생략 시 SIGTERM(15)이 전송됨",
+        "SIGTERM｜signal 15｜프로세스가 처리·정리할 수 있는 정상 종료 요청"
+      ],
+      "explanation": "`kill <PID>`의 기본 시그널은 SIGKILL이 아니라 SIGTERM(15)이다. SIGTERM은 프로세스가 잡아서 정리 루틴(버퍼 flush·락 해제)을 돌린 뒤 종료할 기회를 주므로, 먼저 이것을 보내고 반응이 없을 때만 `kill -9`(SIGKILL)로 강제 종료하는 것이 올바른 순서다. 따라서 '기본이 9'라는 진술은 틀리다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "쉘 스크립트가 중간에 종료되더라도 만든 임시 디렉터리를 항상 지우게 하려면?",
+      "choices": [
+        "스크립트 끝에 `rm -rf \"$TMP\"` 한 줄만 두면 어떤 경우에도 실행된다",
+        "`trap 'rm -rf \"$TMP\"' EXIT` 로 종료·에러·시그널 시 정리 코드를 걸어 둔다",
+        "`nohup` 으로 실행하면 자동으로 정리된다",
+        "`set -e` 만 켜면 실패 시 임시파일이 자동 삭제된다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "trap｜｜지정한 시그널/이벤트 발생 시 실행할 명령을 등록",
+        "EXIT 의사시그널｜｜스크립트가 어떤 경로로든 끝날 때 트리거",
+        "정리 핸들러｜cleanup handler｜자원 해제를 보장하는 종료 처리"
+      ],
+      "explanation": "`trap '...' EXIT`는 정상 종료뿐 아니라 `set -e`로 인한 중단, 에러, INT/TERM 시그널로 끝날 때도 실행되므로 임시자원 정리를 한곳에서 보장한다(필요하면 `trap ... INT TERM EXIT`). 스크립트 맨 끝의 `rm` 한 줄은 중간에 죽으면 도달하지 못하고, `nohup`은 실행 지속용이라 정리와 무관하며, `set -e`는 실패 시 '중단'만 시킬 뿐 파일을 지워 주지 않는다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`uptime` 이 `load average: 8.00, 6.00, 3.00` 을 보여준다. 이 서버가 8코어일 때 가장 타당한 해석은?",
+      "choices": [
+        "load 8은 무조건 심각한 과부하다",
+        "load는 실행 중 프로세스 수의 백분율이라 8%를 뜻한다",
+        "세 숫자는 각각 CPU·메모리·디스크 사용률(%)이다",
+        "8코어에서 1분 부하 8.00은 코어당 약 1.0(포화 근처)이고, 1분>5분>15분이라 최근 부하가 상승하는 추세다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "load average｜｜실행 가능·I/O 대기 프로세스 수의 1·5·15분 지수이동평균",
+        "nproc｜｜사용 가능한 CPU 코어 수를 출력",
+        "정규화｜load ÷ cores｜코어 수로 나눠 코어당 부하로 환산"
+      ],
+      "explanation": "load average는 백분율이 아니라 실행 가능·중단불가 I/O 대기 상태 프로세스 수의 1·5·15분 이동평균이다. 코어 수로 나눠 해석해야 하며, 8코어에서 8.00이면 코어당 1.0으로 대략 포화 지점이다. 세 값이 8>6>3이면 최근일수록 커져 부하가 오르는 중이라는 추세 신호다. 「무조건 심각」은 코어 수 무시, 「CPU/메모리/디스크」·「백분율」은 load의 정의를 잘못 안 것이다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "ox",
+      "q": "리눅스의 load average는 CPU를 기다리는 프로세스뿐 아니라 디스크 I/O 완료를 기다리는 D 상태 프로세스도 포함하므로, CPU 사용률이 낮은데도 load가 높을 수 있다.",
+      "answer": true,
+      "glossary": [
+        "TASK_UNINTERRUPTIBLE｜D 상태｜중단 불가 I/O 대기, load에 포함",
+        "I/O bound｜｜병목이 CPU가 아니라 디스크·네트워크에 있는 상태"
+      ],
+      "explanation": "리눅스 load는 실행 가능(runnable) 프로세스에 더해 중단 불가 슬립(D, 주로 디스크 I/O 대기) 프로세스까지 센다. 그래서 `top`의 `%us`·`%sy`가 낮아도 `%wa`(iowait)가 높으면 load가 치솟을 수 있고, 이때는 코어를 늘려도 소용없이 스토리지 병목을 봐야 한다. 이 특성 때문에 load만으로 CPU 포화를 단정하면 안 되고 CPU 사용률과 함께 봐야 한다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "load가 높을 때 CPU 병목인지 I/O 병목인지 `vmstat 1` 로 가르는 핵심 열은?",
+      "choices": [
+        "`r`(실행 대기) 이 코어 수보다 계속 크면 CPU 포화, `b`(I/O 블록)와 `wa` 가 크면 I/O 대기",
+        "`us` 와 `sy` 는 둘 다 디스크 사용률이다",
+        "`free` 열이 0이면 무조건 CPU 병목이다",
+        "`in`·`cs` 열은 네트워크 대역폭을 뜻한다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "vmstat｜｜프로세스·메모리·I/O·CPU를 주기적으로 요약",
+        "r 열｜runnable｜CPU에서 실행 중이거나 실행을 기다리는 프로세스 수",
+        "b 열｜blocked｜중단 불가 슬립(주로 I/O 대기) 프로세스 수"
+      ],
+      "explanation": "`vmstat 1`에서 `r`(runnable)이 코어 수를 지속적으로 넘으면 CPU가 포화된 것이고, `b`(blocked)가 크고 CPU 열의 `wa`(iowait)가 높으면 I/O 대기다. 방향이 정해지면 CPU는 `top`/`ps`로, I/O는 `iostat -x`로 범인을 좁힌다. 「us·sy가 디스크」는 틀렸고(각각 사용자/커널 CPU 시간), 「free 0=CPU 병목」은 메모리 지표 오해, 「in·cs는 네트워크」도 오해다(각각 인터럽트·컨텍스트 스위치 수).",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "특정 디스크 장치가 포화됐는지 `iostat -x 2` 로 확인할 때 가장 직접적인 지표는?",
+      "choices": [
+        "`%idle` 이 100에 가까운지",
+        "`tps` 가 0인지",
+        "장치의 `%util` 이 100%에 근접하고 `await`(평균 I/O 응답시간, ms) 가 큰지",
+        "`kB_read/s` 가 0인지"
+      ],
+      "answer": 2,
+      "glossary": [
+        "iostat -x｜｜장치별 확장 I/O 통계를 보여주는 옵션",
+        "%util｜｜해당 장치가 I/O 처리로 바쁜 시간 비율",
+        "await｜｜요청 하나가 큐 대기+서비스까지 걸린 평균 시간(ms)"
+      ],
+      "explanation": "`iostat -x`에서 장치의 `%util`이 100%에 근접하면 그 디스크가 더 이상 I/O를 밀어낼 여력이 없다는 뜻이고, `await`(평균 응답시간)와 `aqu-sz`(큐 길이)가 함께 크면 요청이 쌓여 느려지고 있다는 신호다(SSD·다중큐 NVMe에선 %util 해석에 주의). 「%idle 100 근접」·「tps 0」·「kB_read/s 0」은 오히려 장치가 한가하다는 뜻이라 포화 지표로 맞지 않는다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "서버가 느려서 `vmstat 1` 을 보니 `si`·`so` 열의 값이 계속 크게 찍힌다. 무엇을 뜻하는가?",
+      "choices": [
+        "네트워크 송수신량이 많다는 뜻이다",
+        "시스템 인터럽트가 많다는 뜻이다",
+        "스왑 인/아웃이 활발하다 — 물리 메모리가 부족해 디스크를 메모리처럼 쓰고 있어 성능이 급락한다",
+        "signal in/out, 즉 시그널 트래픽이 많다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "si / so｜swap in / swap out｜디스크 스왑에서 메모리로/메모리에서 스왑으로 이동한 양(KB/s)",
+        "스왑｜swap｜메모리 부족 시 디스크를 임시 메모리로 쓰는 영역",
+        "스래싱｜thrashing｜스왑이 과도해 CPU가 페이지 교체에만 매달리는 상태"
+      ],
+      "explanation": "`vmstat`의 `si`(swap in)·`so`(swap out)는 디스크 스왑과 메모리 간에 오가는 페이지 양이다. 이 값이 지속적으로 크면 물리 메모리가 부족해 활발히 스왑 중이라는 뜻으로, 디스크 속도로 메모리를 흉내 내는 셈이라 응답이 급격히 느려진다(스래싱). 원인 프로세스를 찾아 메모리를 줄이거나 RAM을 늘려야 한다. `si/so`는 네트워크·인터럽트·시그널과는 전혀 무관하다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "애플리케이션이 갑자기 죽었는데 로그엔 단서가 없다. 커널이 메모리 부족으로 프로세스를 강제 종료(OOM)했는지 확인하는 방법은?",
+      "choices": [
+        "`dmesg` 나 `journalctl -k` 에서 `Out of memory: Killed process` / `oom-kill` 메시지를 찾는다",
+        "`df -h` 로 디스크 여유를 본다",
+        "`uptime` 으로 재부팅 여부만 확인한다",
+        "`ping` 으로 네트워크를 확인한다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "OOM Killer｜Out Of Memory Killer｜메모리 고갈 시 커널이 프로세스를 골라 죽이는 기능",
+        "dmesg｜｜커널 링 버퍼 메시지를 보는 명령",
+        "oom_score｜｜OOM 시 어떤 프로세스를 죽일지 정하는 점수"
+      ],
+      "explanation": "메모리가 고갈되면 커널 OOM Killer가 프로세스를 골라 SIGKILL로 종료하고 `dmesg`/`journalctl -k`에 `Out of memory: Killed process ...`, `oom-kill:` 로그를 남긴다. 애플리케이션 자체 로그에는 SIGKILL이라 아무 흔적이 없을 수 있으니 커널 로그를 봐야 한다. 「df」는 디스크, 「uptime」은 부팅 시각, 「ping」은 네트워크라 메모리 강제 종료 여부를 알려주지 못한다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`du -sh /var` 합계와 `df -h` 의 사용량이 크게 다를 때(열려 있는 삭제 파일 문제는 아님) 또 다른 흔한 원인은?",
+      "choices": [
+        "du는 항상 df보다 2배 크게 나오도록 설계돼 있다",
+        "어떤 디렉터리 위에 다른 파일시스템이 마운트돼, 그 아래 원래 파일들이 가려져(mount 그림자) du 집계에서 빠질 수 있다",
+        "df는 압축률을 반영하지만 du는 아니어서다",
+        "du는 inode를, df는 블록을 세기 때문에 원래 다르다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "마운트 그림자｜mount shadowing｜기존 디렉터리 위에 마운트하면 아래 내용이 가려짐",
+        "du｜disk usage｜경로를 재귀 순회해 파일 크기를 합산",
+        "df｜disk free｜파일시스템 슈퍼블록의 사용/여유 블록을 보고"
+      ],
+      "explanation": "`du`는 경로를 실제로 순회해 보이는 파일만 더하는데, 어떤 디렉터리 위에 다른 파일시스템을 마운트하면 그 아래 원본 파일들이 가려져 du 집계에서 빠지고, 반면 df는 파일시스템 전체 블록 사용량을 보고하므로 둘이 어긋난다(가려진 파일은 마운트 해제하면 다시 보인다). 「항상 2배」·「압축률 반영」은 근거 없는 서술이고, 「inode vs 블록」은 df -i의 얘기지 기본 df/du 크기 차이의 원인이 아니다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "웹서버로 들어오는 TCP 연결 상태별 개수(ESTABLISHED·TIME-WAIT 등)를 빠르게 요약해서 보려면?",
+      "choices": [
+        "`ss -s` 로 소켓 상태 요약을 보거나 `ss -tan state time-wait | wc -l` 로 특정 상태를 센다",
+        "`ping -c 100` 으로 연결 수를 센다",
+        "`ip route show` 로 확인한다",
+        "`curl localhost` 를 반복 호출한다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "ss -s｜summary｜TCP·UDP 소켓을 상태별로 집계한 요약",
+        "TIME-WAIT｜｜능동적으로 닫은 소켓이 잠시 남는 정상 상태",
+        "state 필터｜ss state｜established·time-wait 등 상태로 소켓을 거름"
+      ],
+      "explanation": "`ss -s`는 상태별 소켓 수를 요약해 주고, `ss -tan state time-wait | wc -l`처럼 상태를 지정해 특정 상태만 셀 수 있다. TIME-WAIT이 많이 쌓이는 것은 클라이언트 측에서 연결을 활발히 여닫는 정상 현상인 경우가 많고, 무작정 `tcp_tw_reuse`를 켜기 전에 연결 재사용(keep-alive)을 먼저 검토한다. 「ping」·「ip route」·「curl 반복」은 연결 상태 통계를 세는 도구가 아니다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "8080 포트를 이미 누군가 점유해 서비스가 bind 에 실패한다. 어떤 프로세스가 그 포트를 쓰는지 찾는 명령으로 적절한 것은?",
+      "choices": [
+        "`netstat -r`",
+        "`ping 8080`",
+        "`lsof -i :8080` (또는 `ss -tlnp 'sport = :8080'`)",
+        "`cat /etc/services | grep 8080`"
+      ],
+      "answer": 2,
+      "glossary": [
+        "lsof｜list open files｜소켓 포함 열린 파일과 그 프로세스를 조회",
+        "-i :포트｜｜지정 포트를 쓰는 네트워크 소켓만 필터",
+        "bind 실패｜EADDRINUSE｜포트가 이미 쓰여 소켓 바인딩이 거부됨"
+      ],
+      "explanation": "`lsof -i :8080`은 그 포트를 쓰는 프로세스의 PID·명령·사용자를 바로 보여주고, `ss -tlnp`로도 리스닝 프로세스를 찾을 수 있다. 「netstat -r」은 라우팅 테이블, 「ping 8080」은 8080을 호스트명으로 오해한 잘못된 사용, 「/etc/services grep」은 포트 번호에 붙은 관례적 서비스명만 보여줄 뿐 실제로 누가 점유 중인지는 알려주지 않는다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`/mnt/data` 를 언마운트하려는데 'target is busy' 가 뜬다. 어떤 프로세스가 그 마운트를 붙잡고 있는지 찾고 정리하는 도구는?",
+      "choices": [
+        "`umount -f` 만 반복하면 언젠가 풀린다",
+        "`chmod 000 /mnt/data` 로 접근을 막는다",
+        "`fuser -vm /mnt/data` 로 사용 중인 프로세스를 확인하고, 필요하면 `fuser -km /mnt/data` 로 종료한다",
+        "`sync` 를 실행하면 busy가 사라진다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "fuser｜｜파일·마운트·포트를 쓰는 프로세스를 찾아 시그널 전송",
+        "-m｜mount｜지정 경로가 속한 마운트를 쓰는 모든 프로세스 대상",
+        "-k｜kill｜찾은 프로세스에 시그널(기본 SIGKILL) 전송"
+      ],
+      "explanation": "`fuser -vm /mnt/data`(또는 `lsof +D /mnt/data`)로 그 마운트를 쓰는 프로세스와 접근 유형(c=현재디렉터리, f=열린파일 등)을 확인하고, `fuser -km`으로 종료한 뒤 언마운트한다(강제 kill은 신중히). 「`umount -f` 반복」은 원인 프로세스를 두면 대개 계속 실패하고(정 안 되면 `umount -l` 지연 언마운트 고려), 「chmod 000」·「sync」는 busy 원인을 해소하지 못한다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "도메인의 IP를 스크립트에서 쓰기 좋게 값만 뽑고, 어느 DNS 서버가 응답했는지도 통제하려면 `dig` 를 어떻게 쓰나?",
+      "choices": [
+        "`dig +short example.com` 로 답만 얻고, `dig @8.8.8.8 example.com` 로 특정 리졸버에 질의한다",
+        "`dig -o example.com` 으로 값만 출력한다",
+        "`dig example.com --resolver 8.8.8.8`",
+        "`nslookup` 외에는 특정 서버 지정이 불가능하다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "dig｜domain information groper｜DNS 질의를 상세히 수행하는 도구",
+        "+short｜｜부가 정보를 빼고 레코드 값만 출력",
+        "@서버｜｜질의를 보낼 DNS 서버를 명시적으로 지정"
+      ],
+      "explanation": "`dig +short example.com`은 ANSWER의 값만 뽑아 스크립트에 쓰기 좋고, `dig @8.8.8.8 example.com`처럼 `@`로 특정 리졸버에 직접 물어 캐시·전파 차이를 비교할 수 있다(권威 응답 추적은 `+trace`). 「`-o`」·「`--resolver`」는 dig의 실제 옵션이 아니고, 특정 서버 지정은 nslookup 전용이 아니라 dig의 `@`로 가능하다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "ox",
+      "q": "`dig` 로는 정상 해석되는 도메인이 애플리케이션에서는 실패할 수 있는데, dig가 `/etc/hosts` 나 nsswitch·mDNS 같은 시스템 이름 해석 경로를 거치지 않고 DNS 서버에 직접 질의하기 때문이다.",
+      "answer": true,
+      "glossary": [
+        "nsswitch.conf｜｜hosts·dns 등 이름 해석 소스와 순서를 정하는 설정",
+        "getaddrinfo｜｜애플리케이션이 쓰는 표준 이름 해석 API",
+        "/etc/hosts｜｜DNS보다 먼저 참조될 수 있는 정적 호스트 매핑"
+      ],
+      "explanation": "`dig`는 DNS 프로토콜로 리졸버에 직접 질의하는 진단 도구라, 애플리케이션이 실제로 쓰는 `getaddrinfo` 경로(`/etc/nsswitch.conf` 순서에 따른 `/etc/hosts`·mDNS·NSS 모듈)를 거치지 않는다. 그래서 hosts 파일 오버라이드나 nsswitch 설정 때문에 앱과 dig의 결과가 갈릴 수 있다. 애플리케이션과 동일한 경로를 보려면 `getent hosts <name>`을 쓰는 것이 정확하다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "HTTP 응답이 느린 원인이 DNS·연결·서버 처리 중 어디인지 `curl` 로 구간별 시간을 재려면?",
+      "choices": [
+        "`curl -s -o /dev/null -w 'dns:%{time_namelookup} conn:%{time_connect} ttfb:%{time_starttransfer} total:%{time_total}\\n' https://example.com`",
+        "`curl --time https://example.com`",
+        "`curl -v` 의 출력 줄 수를 세어 비교한다",
+        "`ping example.com` 의 왕복시간으로 판단한다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "-w｜--write-out｜요청 후 지정 변수(타이밍 등)를 출력",
+        "time_namelookup / time_connect / time_starttransfer｜｜DNS·TCP연결·첫바이트까지 누적 시간",
+        "TTFB｜Time To First Byte｜서버가 첫 응답 바이트를 보내기까지 시간"
+      ],
+      "explanation": "`curl -w`의 `time_namelookup`(DNS)·`time_connect`(TCP)·`time_appconnect`(TLS)·`time_starttransfer`(TTFB)·`time_total`은 각 단계까지의 누적 시간이라, 어느 구간에서 지연이 생기는지 분리해 볼 수 있다(특정 IP로 강제 테스트는 `--resolve`). 「`--time`」은 그런 옵션이 아니고, `-v` 줄 수나 `ping` 왕복시간으로는 HTTP 단계별 지연을 구분하지 못한다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "운영 서버에서 특정 클라이언트↔443 포트 트래픽만 tcpdump로 잡아 나중에 Wireshark로 분석하려 한다. 권장 형태는?",
+      "choices": [
+        "`tcpdump` 만 인자 없이 실행해 전부 콘솔에 뿌린다",
+        "`tcpdump -ni eth0 -c 500 -w cap.pcap 'tcp port 443 and host 10.0.0.9'`",
+        "`tcpdump -w cap.pcap` 로 모든 인터페이스·모든 트래픽을 무기한 저장한다",
+        "`tcpdump -A` 로 페이로드를 화면에 문자열로 출력해 눈으로 읽는다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "BPF 필터｜Berkeley Packet Filter｜host·port 등으로 캡처 대상을 좁히는 표현식",
+        "-w 파일｜｜패킷을 pcap 파일로 저장(Wireshark 호환)",
+        "-n / -c｜｜이름해석 생략(부하·오차 감소) / 지정 개수만 캡처 후 종료"
+      ],
+      "explanation": "`-i`로 인터페이스를 고르고 BPF 필터(`tcp port 443 and host 10.0.0.9`)로 대상만 좁히며, `-w`로 pcap에 저장하면 Wireshark에서 분석할 수 있다. `-n`은 DNS 역질의를 막아 캡처 부하·왜곡을 줄이고, `-c`(또는 `-G`/`-C` 링버퍼)로 무한 캡처를 방지한다. 인자 없는 전량 캡처나 무기한 `-w`는 운영 서버에 부담·디스크 고갈 위험이 크고, `-A` 화면 출력은 대량 트래픽 분석에 부적합하다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "tcpdump 명령에 `-n` 을 붙이는 실무적 이유로 가장 적절한 것은?",
+      "choices": [
+        "패킷을 암호화해서 저장하기 위해",
+        "IP·포트를 이름으로 역질의(DNS)하지 않아, 캡처 중 추가 DNS 트래픽과 지연·왜곡을 막고 출력을 빠르게 하기 위해",
+        "캡처 개수를 n개로 제한하기 위해",
+        "무차별 모드(promiscuous)를 끄기 위해"
+      ],
+      "answer": 1,
+      "glossary": [
+        "-n｜｜호스트·포트 번호를 이름으로 바꾸지 않고 숫자 그대로 표시",
+        "역방향 DNS｜reverse DNS｜IP를 호스트명으로 되묻는 조회",
+        "관찰자 효과｜observer effect｜측정 행위 자체가 트래픽을 만들어 결과를 흐림"
+      ],
+      "explanation": "`-n`은 tcpdump가 IP·포트를 이름으로 바꾸려고 DNS 역질의를 날리는 것을 막는다. 그렇지 않으면 캡처 도중 tcpdump 자신이 DNS 트래픽을 유발해 화면이 느려지고, 특히 DNS 문제를 진단할 때 결과가 오염된다(포트→서비스명 변환 방지는 `-nn`). 「암호화 저장」·「개수 제한(그건 `-c`)」·「promiscuous 끄기(그건 `-p`)」는 모두 다른 기능이다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "이미 실행 중인 프로세스가 아무 로그도 없이 '멈춰(hang)' 있다. 무엇을 기다리는지 알아내는 첫 진단으로 가장 좋은 것은?",
+      "choices": [
+        "`kill -9 <PID>` 로 즉시 죽인 뒤 재현되길 기다린다",
+        "`nice -n -20 -p <PID>` 로 우선순위를 올린다",
+        "`ltrace -c` 로 라이브러리 호출 개수만 센다",
+        "`strace -p <PID>` 로 붙어, 마지막으로 걸려 있는 시스템콜(read·poll·futex·wait4 등)을 확인한다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "strace -p｜｜실행 중인 프로세스에 붙어 시스템콜을 추적(Ctrl-C로 안전 분리)",
+        "블로킹 시스템콜｜｜read·poll·epoll_wait·futex 등 결과를 기다리며 멈추는 호출",
+        "ptrace｜｜strace가 사용하는 프로세스 추적 커널 기능"
+      ],
+      "explanation": "`strace -p <PID>`로 붙으면 프로세스가 어떤 시스템콜에서 멈춰 있는지 즉시 보인다: `read`/`recvfrom`은 소켓·백엔드 응답 대기, `poll`/`epoll_wait`는 외부 이벤트 대기, `futex`는 락 경합을 시사한다(Ctrl-C로 떼면 대상은 계속 실행). 「kill -9」는 원인을 지워 버리고, `nice`는 멈춘 원인과 무관하며, `ltrace -c` 요약은 '지금 무엇을 기다리는지'를 콕 집어 주지 못한다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "포크로 워커를 여러 개 띄우는 데몬이 느리다. 어느 시스템콜이 시간을 지배하는지 요약하려면?",
+      "choices": [
+        "`strace -p <PID>` 만 붙여 흘러가는 출력을 눈으로 읽는다",
+        "`strace -f -c -p <PID>` 로 자식까지 따라가며 30초쯤 모은 뒤 Ctrl-C 로 시스템콜별 시간·호출수·에러 요약을 본다",
+        "`strace -e trace=none -p <PID>`",
+        "`ltrace -S` 로 전체를 실시간 출력한다"
+      ],
+      "answer": 1,
+      "glossary": [
+        "-c｜count｜종료 시 시스템콜별 시간·호출수·에러를 집계 출력",
+        "-f｜follow-forks｜fork/clone로 생긴 자식·스레드까지 추적",
+        "관측 오버헤드｜｜strace는 대상을 크게 느리게 하므로 짧게·필터해서 사용"
+      ],
+      "explanation": "`strace -f -c -p <PID>`는 자식(워커)까지 따라가며 잠깐 모은 뒤 시스템콜별 `% time`·호출수·에러를 요약한다. `read`가 지배하면 I/O, `futex`면 락 경합, `poll`/`epoll_wait`면 상류 대기라는 식으로 문제 계층을 좁힌다. strace는 대상을 2~100배 느리게 하므로 짧게, `-e`로 좁혀 쓴다. 「그냥 -p로 눈 읽기」는 데이터에 파묻히고, `trace=none`은 사실상 아무것도 안 보며, `ltrace`는 시스템콜이 아니라 라이브러리 호출을 본다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "`strace` 와 `ltrace` 의 차이로 옳은 것은?",
+      "choices": [
+        "strace는 시스템콜(커널 진입)을, ltrace는 공유 라이브러리 함수 호출을 추적한다",
+        "둘은 완전히 같고 이름만 다르다",
+        "strace는 정적 링크 바이너리만, ltrace는 동적 링크만 지원하지 않는다",
+        "ltrace는 커널 함수 내부를, strace는 사용자 함수를 추적한다"
+      ],
+      "answer": 0,
+      "glossary": [
+        "시스템콜｜syscall｜open·read·write 등 커널에 요청하는 경계 호출",
+        "라이브러리 호출｜library call｜libc 등 공유 라이브러리 함수(malloc·strcmp 등) 호출",
+        "동적 링크｜dynamic linking｜실행 시 공유 라이브러리를 연결하는 방식"
+      ],
+      "explanation": "strace는 프로세스가 커널로 넘어가는 시스템콜을, ltrace는 그 위 계층인 공유 라이브러리 함수(예: `malloc`·`getenv`·`strcmp`) 호출을 추적한다. 그래서 파일·네트워크·프로세스 문제는 strace, 애플리케이션이 어떤 라이브러리 API를 어떻게 호출하는지는 ltrace가 유용하다. 「같다」는 틀렸고, ltrace는 동적 링크에 의존해 정적 바이너리엔 거의 무력하며(지원 방향이 보기와 반대), 커널 '내부' 함수를 보는 도구는 둘 다 아니다(그건 ftrace/perf).",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "systemd 서버에서 부팅 후 기동에 실패한 서비스들을 한눈에 찾고 재시도하려면?",
+      "choices": [
+        "`systemctl poweroff` 로 재부팅만 반복한다",
+        "`ps aux | grep failed` 로 찾는다",
+        "`dmesg | grep systemd` 만 보면 모든 실패 원인이 나온다",
+        "`systemctl list-units --state=failed`(또는 `--failed`) 로 실패 유닛을 보고, `journalctl -u <유닛> -b` 로 원인을 확인한 뒤 고치고 `systemctl reset-failed` 로 실패 표시를 초기화한다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "list-units --failed｜｜기동에 실패한 유닛만 나열",
+        "journalctl -u ... -b｜｜해당 유닛의 이번 부팅 로그를 조회",
+        "reset-failed｜｜유닛의 실패 카운트·상태 표시를 초기화"
+      ],
+      "explanation": "`systemctl --failed`로 실패한 유닛을 나열하고, 각 유닛의 `journalctl -u <유닛> -b`로 이번 부팅에서의 실제 종료 사유(ExecStart 오류·의존성 실패 등)를 확인해 고친 다음, `systemctl reset-failed`로 실패 상태를 지우고 `restart`한다. 「재부팅 반복」은 근본 해결이 아니고, 「`ps | grep failed`」는 실패한 유닛을 못 찾으며(이미 죽어 프로세스가 없음), dmesg만으로는 유닛별 애플리케이션 오류를 다 알 수 없다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "저널 로그가 디스크를 많이 차지한다. 사용량을 확인하고 오래된 로그를 안전하게 줄이는 방법은?",
+      "choices": [
+        "`rm -rf /var/log/journal/*` 로 통째로 지운다",
+        "`> /var/log/journal` 로 리다이렉션한다",
+        "`journalctl --disk-usage` 로 크기를 보고, `journalctl --vacuum-size=500M`(또는 `--vacuum-time=7d`) 로 정리한다",
+        "`systemctl stop systemd-journald` 후 방치한다"
+      ],
+      "answer": 2,
+      "glossary": [
+        "--disk-usage｜｜저널이 현재 차지한 디스크 용량 표시",
+        "--vacuum-size / --vacuum-time｜｜용량·기간 기준으로 오래된 저널 삭제",
+        "journald｜｜systemd의 로그 수집·저장 데몬"
+      ],
+      "explanation": "`journalctl --disk-usage`로 현재 용량을 보고, `--vacuum-size`나 `--vacuum-time`으로 기준을 넘는 오래된 저널만 정리하면 안전하다(영구 상한은 `journald.conf`의 `SystemMaxUse=`). 「`rm -rf`」·「리다이렉션」은 journald가 열고 있는 파일을 깨거나 예기치 않은 동작을 부를 수 있고, journald를 그냥 멈추면 이후 로그가 유실돼 진단이 더 어려워진다.",
+      "tags": ["linux"]
+    },
+    {
+      "type": "mcq",
+      "q": "특정 목적지 IP로 나가는 패킷이 실제로 어느 인터페이스·게이트웨이·소스 주소를 통해 라우팅되는지, 커널의 실제 결정을 즉시 확인하려면?",
+      "choices": [
+        "`ping <IP>` 의 왕복시간으로 경로를 추정한다",
+        "`ifconfig -a` 로 인터페이스 목록만 나열한다",
+        "`cat /etc/hosts` 를 확인한다",
+        "`ip route get <IP>` 로 커널이 그 목적지에 고르는 경로·소스주소·출력 인터페이스를 조회한다"
+      ],
+      "answer": 3,
+      "glossary": [
+        "ip route get｜｜특정 목적지에 대한 커널의 라우팅 결정을 그대로 출력",
+        "소스 주소 선택｜source address selection｜여러 IP 중 어떤 것을 출발지로 쓸지 커널이 결정",
+        "게이트웨이｜gateway｜다른 네트워크로 나갈 때 거치는 다음 홉 라우터"
+      ],
+      "explanation": "`ip route get <IP>`는 라우팅 테이블을 사람이 해석하지 않아도, 커널이 그 목적지에 실제로 고르는 경로·다음 홉(게이트웨이)·출력 인터페이스(dev)·선택된 소스 주소(src)를 한 줄로 알려줘 멀티홈·정책 라우팅 환경에서 특히 유용하다. 「ping」은 도달성·지연만 보여 줄 뿐 경로 결정을 알려주지 못하고, 「ifconfig -a」는 인터페이스 목록일 뿐 어느 것으로 나가는지 판단하지 않으며, 「/etc/hosts」는 이름→IP 매핑이라 라우팅과 무관하다.",
+      "tags": ["linux"]
+    }
+  ]
+}
