@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_leveling()
 	_test_pack_parser()
 	_test_pack_import()
+	_test_pack_filter()
 	_test_grade()
 	_test_breeding()
 	print("--- %d passed, %d failed ---" % [_passes, _failures])
@@ -399,6 +400,20 @@ func _test_breeding() -> void:
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
+func _test_pack_filter() -> void:
+	_section("PackFilter")
+	var m_jp := {"title": "JLPT N2 문법", "tags": ["jlpt", "n2"], "category": "japanese"}
+	var m_semi := {"title": "반도체공정 1", "tags": ["engineering", "semiconductor"]}  # category 없음 → 폴백
+	_eq(PackFilter.category_of(m_jp), "japanese", "category_of 명시 필드 우선")
+	_eq(PackFilter.category_of(m_semi), "semiconductor", "category_of 폴백(태그 키워드)")
+	_truthy(PackFilter.matches(m_jp, "", ""), "매치: 전체(빈 카테고리·빈 쿼리)")
+	_truthy(PackFilter.matches(m_jp, "japanese", ""), "매치: 카테고리 일치")
+	_truthy(not PackFilter.matches(m_jp, "backend", ""), "매치: 카테고리 불일치")
+	_truthy(PackFilter.matches(m_jp, "", "문법"), "매치: 검색 제목 부분일치")
+	_truthy(not PackFilter.matches(m_jp, "", "clickhouse"), "매치: 검색 불일치")
+	_truthy(PackFilter.matches({"title": "ClickHouse Basics", "tags": ["clickhouse"]}, "", "click"), "매치: 검색 대소문자 무시")
+
+
 func _section(name: String) -> void:
 	print("\n[%s]" % name)
 
