@@ -65,6 +65,13 @@ var _timeout_fired := false
 var _choice_press_pos: Vector2 = Vector2.ZERO
 var _choice_pressed: bool = false
 
+# 팩 목록 카테고리 필터 + 검색. 파싱 캐시로 키입력마다 재파싱하지 않는다.
+var _pack_cache: Array = []  # [{path, pack}]
+var _active_category: String = ""
+var _search_query: String = ""
+var _chip_row: HBoxContainer
+var _search_edit: LineEdit
+
 
 func _ready() -> void:
 	_build_pack_select()
@@ -160,6 +167,23 @@ func _build_pack_select() -> void:
 	hint.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
 	pack_root.add_child(hint)
 
+	# ─ 카테고리 칩 + 검색 필터 바 (hint와 목록 사이)
+	_search_edit = LineEdit.new()
+	_search_edit.placeholder_text = "🔍 검색: 제목·태그…"
+	_search_edit.clear_button_enabled = true
+	_search_edit.text_changed.connect(func(t: String) -> void:
+		_search_query = t
+		_apply_filter())
+	pack_root.add_child(_search_edit)
+	var chip_scroll := ScrollContainer.new()
+	chip_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	chip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	chip_scroll.custom_minimum_size.y = 44
+	_chip_row = HBoxContainer.new()
+	_chip_row.add_theme_constant_override("separation", 6)
+	chip_scroll.add_child(_chip_row)
+	pack_root.add_child(chip_scroll)
+
 	pack_status_label = Label.new()
 	pack_status_label.visible = false
 	pack_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -183,12 +207,15 @@ func _build_pack_select() -> void:
 
 
 func _populate_pack_list() -> void:
-	_clear_children(pack_list_box)
-	pack_status_label.visible = false
-	# 항상 최상단에 만들기/가져오기 진입.
-	pack_list_box.add_child(_make_create_entry())
-	# 유저 제작/임포트(user://) 팩을 먼저, 그다음 번들(res://) 팩. 내가 만든 팩을
-	# 30여 개 번들 아래로 묻지 않고 진입 버튼 바로 밑에서 바로 찾게 한다.
+	_rebuild_pack_cache()
+	_rebuild_chips()
+	_apply_filter()
+
+
+# 팩 파싱은 화면 진입 시 1회 — 이후 필터/검색은 캐시에서(키입력마다 재파싱 방지).
+func _rebuild_pack_cache() -> void:
+	_pack_cache.clear()
+	# 유저 제작/임포트(user://) 팩을 먼저, 그다음 번들(res://) 팩.
 	# (모바일은 res://가 읽기전용이라 유저 팩은 user://quizzes 에서 온다.)
 	var paths: Array[String] = []
 	for up in PackImport.list_user_packs():
@@ -202,14 +229,64 @@ func _populate_pack_list() -> void:
 		names.sort()
 		for f in names:
 			paths.append("%s/%s" % [QUIZ_DIR, f])
-	if paths.is_empty():
-		_show_pack_status("아직 퀴즈팩이 없어요. 위 '문제집 만들기'로 추가해 보세요!")
-		return
 	for path in paths:
 		var parsed := PackParser.parse_file(path)
 		if not parsed.get("ok", false):
 			continue  # 깨진 팩은 목록에서 제외 (파서가 검증 책임)
-		pack_list_box.add_child(_make_pack_card(path, parsed["pack"]))
+		_pack_cache.append({"path": path, "pack": parsed["pack"]})
+
+
+# 비어있지 않은 카테고리만 칩으로(카운트 포함). "전체" 칩이 맨 앞.
+func _rebuild_chips() -> void:
+	for c in _chip_row.get_children():
+		c.queue_free()
+	var counts: Dictionary = {}
+	for e in _pack_cache:
+		var k := PackFilter.category_of(e.pack.get("meta", {}))
+		counts[k] = int(counts.get(k, 0)) + 1
+	_add_chip("전체", "", _pack_cache.size())
+	for cat in PackFilter.CATEGORIES:
+		var n := int(counts.get(cat.key, 0))
+		if n > 0:
+			_add_chip(String(cat.name), String(cat.key), n)
+
+
+func _add_chip(label: String, key: String, n: int) -> void:
+	var b := Button.new()
+	b.text = "%s %d" % [label, n]
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.button_pressed = (_active_category == key)
+	b.set_meta("cat", key)
+	b.pressed.connect(func() -> void:
+		Sfx.play("click")
+		_active_category = key
+		_sync_chip_pressed()
+		_apply_filter())
+	_chip_row.add_child(b)
+
+
+func _sync_chip_pressed() -> void:
+	for c in _chip_row.get_children():
+		if c is Button:
+			(c as Button).button_pressed = (String((c as Button).get_meta("cat", "")) == _active_category)
+
+
+# 캐시에서 활성 카테고리 + 검색어에 맞는 팩만 목록에 그린다.
+func _apply_filter() -> void:
+	_clear_children(pack_list_box)
+	pack_status_label.visible = false
+	pack_list_box.add_child(_make_create_entry())  # 항상 최상단 만들기/가져오기
+	if _pack_cache.is_empty():
+		_show_pack_status("아직 퀴즈팩이 없어요. 위 '문제집 만들기'로 추가해 보세요!")
+		return
+	var shown := 0
+	for e in _pack_cache:
+		if PackFilter.matches(e.pack.get("meta", {}), _active_category, _search_query):
+			pack_list_box.add_child(_make_pack_card(e.path, e.pack))
+			shown += 1
+	if shown == 0:
+		_show_pack_status("조건에 맞는 팩이 없어요.")
 
 
 # 목록 최상단 진입 버튼 — 코랄 톤으로 1차 동선을 명확히.
