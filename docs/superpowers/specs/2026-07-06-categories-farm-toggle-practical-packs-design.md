@@ -29,6 +29,7 @@ Part A(UI)와 Part C(신규 팩)에 공통이므로 함께 확정한다.
 | `data-eng` | 데이터 엔지니어 | 0 (신규) |
 | `ai-eng` | AI 엔지니어 | 0 (신규) |
 | `backend` | 백엔드 | 0 (신규) |
+| `linux` | Linux 명령어 | 0 (신규) |
 | `logpresso` | Logpresso | 0 (신규, 로컬 전용) |
 
 - **표시 순서**: 위 표 순서를 고정 배열로 관리(코드 상수). 미지의 category는 "기타"로.
@@ -130,15 +131,27 @@ Part A(UI)와 Part C(신규 팩)에 공통이므로 함께 확정한다.
 ## Part C — 실무 레퍼런스 팩 파일럿
 
 ### C.1 범위 (사용자 결정: 먼저 각 1팩 → 확장)
-파일럿 5팩, 각 ~30문항. 이후 품질 게이트 통과 시 분야당 다수 팩으로 확장.
+파일럿 6팩, 각 ~30문항(Linux는 ~35-40). 이후 품질 게이트 통과 시 분야당 다수 팩으로 확장.
 
 | 팩 | category | 공개 | 출처 |
 |---|---|---|---|
 | AI 엔지니어 (실무 기초) | `ai-eng` | public OK | 웹 리서치(exa/deep-research) |
 | 데이터 엔지니어 (실무 기초) | `data-eng` | public OK | 웹 리서치 |
 | 백엔드 (실무 기초) | `backend` | public OK | 웹 리서치 |
+| Linux 명령어 (기초~서버실무) | `linux` | **public OK** | 제네릭 Linux/systemd/MariaDB 지식 |
 | Logpresso SQL | `logpresso` | **로컬 전용** | 공식 문서 리서치 |
 | Logpresso 설치·운영 | `logpresso` | **로컬 전용** | 제공된 설치 PDF(새니타이즈) |
+
+**Linux 명령어 팩 (사용자 추가 요청)**: 초심자 Linux 사용자 필수 명령 + 서버 설치·운영
+실무에서 쓰는 제네릭 명령을 아우른다. 범위 예: 파일·디렉터리(`ls cd pwd cp mv rm mkdir
+cat less head tail`), 권한(`chmod chown`, 8진수 표기), 프로세스(`ps top kill grep`),
+디스크·시스템(`df du free uname`), 텍스트·검색(`grep find vi/vim 기초`), 서비스·튜닝
+(`systemctl`, `sysctl -p`, `setenforce/getenforce` SELinux, `ln -s` 심볼릭 링크,
+`tar` 압축해제, MariaDB 제네릭 `galera_new_cluster`·서비스 기동). **공개 유지 근거**:
+전부 공개된 제네릭 Linux/오픈소스 지식 — 기밀 아님. **제외(공개 팩에 절대 안 넣음)**:
+Logpresso 고유 명령(`sonar.*`·`araqne`·`logpresso.*`), PDF의 리터럴 비번·내부 IP·
+고객사명·작성자 — 이들은 로컬 전용 logpresso 팩에만. 문항마다 glossary(명령 요약 카드)
++ 오답서술 해설 필수(예: 왜 `rm -rf`가 위험한지, `chmod 777`의 함정 등 실무 함정 포함).
 
 ### C.2 난이도·형식 (사용자 결정: 실무 중급~고급 + 도움말·해설 카드 필수)
 - 난이도: 실무 중급~고급, **실무 레퍼런스** 지향(현업 함정·베스트프랙티스 중심).
@@ -188,8 +201,8 @@ Verifier     → 사실성 적대검증(공식문서 대조) + PackParser 헤드
 
 1. **Part B** (목장 토글) — 작고 독립. 몽글목장 커밋 1개.
 2. **Part A** (카테고리 UI) — (a) category 마이그레이션 커밋(각 게임), (b) 필터 UI 커밋(각 게임).
-3. **Part C** (파일럿 팩) — public 3팩(ai/data/backend)은 커밋; logpresso 2팩은 로컬 전용
-   (gitignore, 커밋 안 함). 별도 품질 게이트.
+3. **Part C** (파일럿 팩) — public 4팩(ai/data/backend/linux)은 커밋; logpresso 2팩은
+   로컬 전용(gitignore, 커밋 안 함). 별도 품질 게이트.
 4. exe 재빌드(몽글목장 + studyandgame-godot)는 마지막. push는 사용자 승인 후.
 
 각 게임 파리티 유지. 커밋마다 CLAUDE.md §5 트레일러.
