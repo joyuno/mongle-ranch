@@ -18,6 +18,7 @@ signal pity_changed(pity: Dictionary)
 signal market_changed
 signal streak_changed(count: int)
 signal quiet_mode_changed(enabled: bool)
+signal farm_visible_changed(enabled: bool)
 signal timer_enabled_changed(enabled: bool)
 signal font_size_scale_changed(scale: int)
 signal github_username_changed(username: String)
@@ -133,6 +134,10 @@ func get_github_last_event_id() -> String:
 
 func is_quiet_mode() -> bool:
 	return bool(progress.get("quietMode", false))
+
+
+func is_farm_visible() -> bool:
+	return bool(progress.get("showFarm", false))  # 목장 뷰 — 기본 off(회사용 차분 화면)
 
 
 func is_timer_enabled() -> bool:
@@ -624,6 +629,12 @@ func set_quiet_mode(enabled: bool) -> void:
 	quiet_mode_changed.emit(enabled)
 
 
+func set_farm_visible(enabled: bool) -> void:
+	progress["showFarm"] = enabled
+	_persist()
+	farm_visible_changed.emit(enabled)
+
+
 func set_timer_enabled(enabled: bool) -> void:
 	progress["timerEnabled"] = enabled
 	_persist()
@@ -793,6 +804,7 @@ func _default_progress() -> Dictionary:
 		"wrongNote": [],
 		"quizSessions": {},
 		"quietMode": false,
+		"showFarm": false,
 		"timerEnabled": true,
 		"fontSizeScale": 1,
 	}
