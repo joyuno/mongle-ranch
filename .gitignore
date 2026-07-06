@@ -52,3 +52,7 @@ docs/RISKS.md
 
 # Exported build output
 build/
+
+# Confidential source material (internal/customer docs) — local-only, never publish.
+# e.g. the Logpresso install guide (㊙️ Terasys internal: customer names, credentials).
+*.pdf
