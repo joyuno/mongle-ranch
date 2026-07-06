@@ -56,3 +56,7 @@ build/
 # Confidential source material (internal/customer docs) — local-only, never publish.
 # e.g. the Logpresso install guide (㊙️ Terasys internal: customer names, credentials).
 *.pdf
+
+# Local-only practical packs (Logpresso — internal/product-specific) — never publish.
+# Ship in the local exe (export ignores gitignore) but never commit to a public repo.
+data/quizzes/logpresso-*.json
