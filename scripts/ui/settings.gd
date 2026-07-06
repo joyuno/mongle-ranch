@@ -134,6 +134,11 @@ func _build_ui() -> void:
 	quiet_check.set_pressed_no_signal(ProgressStore.is_quiet_mode())
 	quiet_check.toggled.connect(func(on: bool) -> void: ProgressStore.set_quiet_mode(on))
 	quiz_box.add_child(quiet_check)
+	var farm_check := CheckButton.new()
+	farm_check.text = "목장 표시 (끄면 회사용 차분한 화면)"
+	farm_check.set_pressed_no_signal(ProgressStore.is_farm_visible())
+	farm_check.toggled.connect(func(on: bool) -> void: ProgressStore.set_farm_visible(on))
+	quiz_box.add_child(farm_check)
 
 	# ─ 퀴즈팩
 	var pack_box := _make_section(body, "scroll", "퀴즈팩")
