@@ -26,6 +26,7 @@ var _snack_label: Label
 var _streak_label: Label
 var _sync_label: Label
 var _yard: Panel
+var _cta_node: Control  # 목장 off일 때 마당 대신 표시하는 "퀴즈 시작" 패널
 var _decor_layer: Control
 var _empty_label: Label
 var _toast_label: Label
@@ -97,7 +98,34 @@ func _build_layout() -> void:
 	_sync_label.add_theme_color_override("font_color", ThemeSetup.C_MUTED)
 	hud.add_child(_sync_label)
 
-	# ─ 중앙 마당 (배경 5레이어 + 캐릭터)
+	# ─ 중앙 영역 — 목장 표시 on이면 마당(배경 5레이어+캐릭터), off면 "퀴즈 시작" 화면.
+	_mount_center(vbox)
+
+	# ─ 하단 네비 버튼 행 (아이콘 + 라벨)
+	# 맨 앞에 비인터랙티브 '목장' 홈 앵커 칩 — "지금 여기가 목장" 신호.
+	# 네비 버튼들은 다른 화면으로 떠나는 런처라 active 표시가 거짓이 되므로,
+	# 떠나지 않는 별도 칩으로만 홈을 고정한다(CONTEXT의 가짜 active 금지).
+	var nav := HBoxContainer.new()
+	nav.add_theme_constant_override("separation", 8)
+	vbox.add_child(nav)
+	nav.add_child(_make_home_anchor())
+	for item in NAV_ITEMS:
+		nav.add_child(_make_nav_button(item))
+
+	_build_overlays()
+
+
+# 중앙 영역 마운트 — 목장 표시 설정에 따라 마당 또는 "퀴즈 시작" CTA.
+# 토글은 설정 화면에 있고 목장 복귀는 change_scene로 재생성되므로, 빌드 시점에
+# is_farm_visible()를 한 번 읽으면 충분(라이브 시그널·리마운트 불필요).
+func _mount_center(parent: Node) -> void:
+	if ProgressStore.is_farm_visible():
+		_build_yard(parent)
+	else:
+		_mount_cta(parent)
+
+
+func _build_yard(parent: Node) -> void:
 	_yard = Panel.new()
 	_yard.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_yard.clip_contents = true
@@ -106,7 +134,7 @@ func _build_layout() -> void:
 	yard_sb.set_corner_radius_all(20)
 	yard_sb.corner_detail = 12
 	_yard.add_theme_stylebox_override("panel", yard_sb)
-	vbox.add_child(_yard)
+	parent.add_child(_yard)
 	_build_background()
 
 	_empty_label = Label.new()
@@ -121,18 +149,28 @@ func _build_layout() -> void:
 	_empty_label.visible = false
 	_yard.add_child(_empty_label)
 
-	# ─ 하단 네비 버튼 행 (아이콘 + 라벨)
-	# 맨 앞에 비인터랙티브 '목장' 홈 앵커 칩 — "지금 여기가 목장" 신호.
-	# 네비 버튼들은 다른 화면으로 떠나는 런처라 active 표시가 거짓이 되므로,
-	# 떠나지 않는 별도 칩으로만 홈을 고정한다(CONTEXT의 가짜 active 금지).
-	var nav := HBoxContainer.new()
-	nav.add_theme_constant_override("separation", 8)
-	vbox.add_child(nav)
-	nav.add_child(_make_home_anchor())
-	for item in NAV_ITEMS:
-		nav.add_child(_make_nav_button(item))
 
-	_build_overlays()
+# 목장 off — 차분한 단색 패널 + 중앙 "퀴즈 시작" 버튼 하나(회사용).
+func _mount_cta(parent: Node) -> void:
+	var panel := Panel.new()
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = ThemeSetup.C_PANEL
+	sb.set_corner_radius_all(20)
+	sb.corner_detail = 12
+	panel.add_theme_stylebox_override("panel", sb)
+	parent.add_child(panel)
+	_cta_node = panel
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.add_child(center)
+	var btn := Button.new()
+	btn.text = "퀴즈 시작"
+	btn.custom_minimum_size = Vector2(240, 72)
+	btn.add_theme_font_size_override("font_size", 26)
+	btn.pressed.connect(func() -> void: Sfx.play("click"); get_tree().change_scene_to_file("res://scenes/Quiz.tscn"))
+	center.add_child(btn)
 
 
 # ─ 마당 배경: 하늘 그라데이션 / 원경 언덕 / 잔디 / (소품) / 전경 비네트
@@ -480,6 +518,8 @@ func _on_collection_changed() -> void:
 
 
 func _rebuild_sprites() -> void:
+	if _yard == null:
+		return  # 목장 off — 마당이 없으니 스프라이트도 없음
 	var members: Array = ProgressStore.ranch_members()
 	var seen: Dictionary = {}
 	var bounds := _yard_bounds()
