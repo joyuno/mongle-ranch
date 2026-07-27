@@ -1,27 +1,82 @@
-extends SceneTree
+extends Node
 
-const ProgressStoreScript = preload("res://scripts/autoload/progress_store.gd")
+const PROGRESS_PATHS := ["user://progress.json", "user://progress.json.bak", "user://progress.json.tmp"]
 
-func _initialize() -> void:
-	var progress_store: Node = ProgressStoreScript.new()
-	progress_store.name = "ProgressStore"
-	root.add_child(progress_store)
-	for autoload in [
-		["PackStore", load("res://scripts/autoload/pack_store.gd")],
-		["GithubSync", load("res://scripts/autoload/github_sync.gd")],
-		["ThemeSetup", load("res://scripts/autoload/theme_setup.gd")],
-		["Sfx", load("res://scripts/autoload/sfx.gd")],
-	]:
-		var node: Node = (autoload[1] as Script).new()
-		node.name = autoload[0]
-		root.add_child(node)
-	var original := bool(progress_store.call("is_farm_visible"))
-	progress_store.call("set_farm_visible", false)
-	var scene: Node = load("res://scenes/Ranch.tscn").instantiate()
-	root.add_child(scene)
-	assert(scene.get("_yard") == null)
-	scene.call("_sort_sprites")
-	assert(scene != null)
-	scene.queue_free()
-	progress_store.call("set_farm_visible", original)
-	quit(0)
+var _original_progress: Dictionary
+var _original_files: Dictionary = {}
+var _failures := 0
+var _scene: Node
+var _frames := 0
+
+
+func _ready() -> void:
+	print("ranch-off smoke start")
+	_original_progress = ProgressStore.progress.duplicate(true)
+	_snapshot_progress_files()
+	ProgressStore.set_farm_visible(false)
+	_scene = load("res://scenes/Ranch.tscn").instantiate()
+	add_child(_scene)
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	_frames += 1
+	if _frames < 20:
+		return
+	set_process(false)
+	_check(_scene.get("_yard") == null, "Farm-OFF scene mounts without a yard")
+	_scene.queue_free()
+	_finish()
+
+
+func _check(condition: bool, label: String) -> void:
+	if condition:
+		print("PASS: %s" % label)
+	else:
+		_failures += 1
+		push_error("FAIL: %s" % label)
+
+
+func _finish() -> void:
+	ProgressStore.progress = _original_progress.duplicate(true)
+	ProgressStore._persist()
+	_check(_restore_progress_files() and _progress_files_match(), "progress files restore original bytes and existence")
+	if _failures == 0:
+		print("ranch-off smoke success")
+	else:
+		print("ranch-off smoke failure: %d" % _failures)
+
+
+func _snapshot_progress_files() -> void:
+	for path in PROGRESS_PATHS:
+		var exists := FileAccess.file_exists(path)
+		_original_files[path] = {
+			"exists": exists,
+			"bytes": FileAccess.get_file_as_bytes(path) if exists else PackedByteArray(),
+		}
+
+
+func _restore_progress_files() -> bool:
+	for path in PROGRESS_PATHS:
+		var snapshot: Dictionary = _original_files[path]
+		if bool(snapshot["exists"]):
+			var file := FileAccess.open(path, FileAccess.WRITE)
+			if file == null:
+				return false
+			file.store_buffer(snapshot["bytes"])
+			file.close()
+		elif FileAccess.file_exists(path):
+			if DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) != OK:
+				return false
+	return true
+
+
+func _progress_files_match() -> bool:
+	for path in PROGRESS_PATHS:
+		var snapshot: Dictionary = _original_files[path]
+		var exists := FileAccess.file_exists(path)
+		if exists != bool(snapshot["exists"]):
+			return false
+		if exists and FileAccess.get_file_as_bytes(path) != snapshot["bytes"]:
+			return false
+	return ProgressStore.progress == _original_progress
