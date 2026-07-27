@@ -35,6 +35,7 @@ assets/swords/_backup_*/
 # Memory and dev workspace — local-only state, not part of the repo
 MEMORY.md
 _workspace/
+.worktrees/
 .omc/
 tests/debug_*.gd
 tests/debug_*.gd.uid
