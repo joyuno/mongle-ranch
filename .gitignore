@@ -61,3 +61,6 @@ build/
 # Local-only practical packs (Logpresso — internal/product-specific) — never publish.
 # Ship in the local exe (export ignores gitignore) but never commit to a public repo.
 data/quizzes/logpresso-*.json
+
+# Exact local artifact; contents are intentionally not inspected.
+/terasys@192.168.10.6

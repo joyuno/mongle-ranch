@@ -583,6 +583,8 @@ func _friend_position(exclude_uid: int) -> Vector2:
 
 
 func _sort_sprites() -> void:
+	if _yard == null:
+		return
 	var yh := maxf(_yard.size.y, 1.0)
 	for sprite_uid in _sprites:
 		var sprite = _sprites[sprite_uid]
