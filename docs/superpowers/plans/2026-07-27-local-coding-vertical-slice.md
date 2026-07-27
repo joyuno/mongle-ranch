@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve the current quiz and creature game while adding one locally hosted, server-authoritative Python coding problem that Godot can load, submit to private Judge0, and reward exactly once after all hidden tests pass.
+**Goal:** Make server-authoritative Python coding tests the primary problem-solving loop while preserving the current objective quiz, wrong-note, and SRS flow as an independent auxiliary study mode.
 
 **Architecture:** Godot talks only to a versioned FastAPI game API. The API owns guest identity, problem metadata, submissions, wallet state, and reward idempotency in PostgreSQL; a replaceable `JudgeClient` is the only component that can reach Judge0. The first slice stays synchronous and local for observability, but its API, ownership, and ledger boundaries remain suitable for later hosted workers, account linking, rankings, and P2P trading.
 
@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Godot 4.6.2 stable, GDScript only. No C#.
-- Existing objective quiz JSON schema, wrong-note flow, and SRS behavior remain compatible.
+- Python coding tests are the primary game loop; the existing objective quiz, wrong-note, and SRS flow remains accessible as an auxiliary study mode.
 - Godot UI remains code-first; each new `.tscn` is only a root `Control` plus attached script.
 - `RichTextLabel.bbcode_enabled = false` always; prefer `Label` for untrusted server text.
 - State integration uses autoloads and signals; UI scenes do not call each other directly.
@@ -76,7 +76,7 @@ The first slice is complete only when an actual Godot screen submits Python thro
 - Create `scenes/CodingChallenge.tscn` — three-line scene skeleton.
 - Create `scripts/ui/coding_challenge.gd` — problem, editor, run/submit, result, and reward UI.
 - Create `tests/ranch_off_smoke.gd` — scene-level regression for the null-yard failure.
-- Create `tests/quiz_regression.gd` — executable objective-quiz, wrong-note, review, ladder, and streak regression.
+- Create `tests/quiz_regression.gd` — executable auxiliary objective-quiz, wrong-note, review, and ladder regression.
 - Create `tests/game_api_contract.gd` — local fake-server contract runner.
 
 ### New game server
@@ -198,7 +198,7 @@ Exercise these behaviors through public `PackStore` entry points:
 ```text
 correct answer -> correct_count increments and ladder advances
 wrong answer -> wrong-note count increments and ladder resets
-review session -> load_review_session returns true and uses SRS without changing quiz streak
+review session -> load_review_session returns true, answer and advance reach the existing completion path
 coding API remains unused -> no GameApi signal is required for objective-quiz actions
 ```
 
