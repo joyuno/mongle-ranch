@@ -822,6 +822,19 @@ git -C ..\study_game_server commit -m "feat(economy): reward first accepted exac
 
 ### Task 9: Assemble the Private Local Docker Topology
 
+**Status:** Steps 1-5 and 7 complete (commits `3a5300a`, `9a56c96`). Step 6
+(Judge0 execution smoke) is blocked: Judge0 CE 1.13.1's bundled isolate
+requires the cgroup v1 memory hierarchy, but this Docker Desktop's WSL2
+backend exposes only cgroup v2 — the smoke reaches Judge0 but returns status
+`13` with no submission box (evidence: `docs/LOCAL_CODING_SETUP.md`
+"Docker Desktop Limitation"). Do not retry this step by weakening isolation
+or switching to an unreviewed fork image. Windows local development instead
+uses the Piston fallback approved in
+`docs/superpowers/specs/2026-07-28-piston-local-fallback-design.md` and
+implemented per `docs/superpowers/plans/2026-07-28-piston-local-fallback.md`
+(ledger: `.superpowers/sdd/2026-07-28-piston-local-fallback/progress.md`);
+Judge0 remains the Linux/online backend, unchanged by that fallback.
+
 **Files:**
 - Create: `../study_game_server/compose.yml`
 - Create: `../study_game_server/judge0.conf.example`
