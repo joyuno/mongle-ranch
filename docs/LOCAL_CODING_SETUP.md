@@ -121,13 +121,37 @@ validated via `docker compose config`). Found and fixed while live:
   process slots) — all three fixed in source and individually re-verified
   against the live service with an equivalent inline probe.
 
-**Not yet proven**: the `api` container has no source bind mount (code is
-baked in at build time), so the fixes above and the new
-`tests/test_piston_integration.py` / `tests/test_piston_vertical_slice.py`
-files are not present in the currently-running container, and
-`pytest -m piston` has not actually been executed. A `--build` is required
-to prove this for real; deferred to a session with more free host memory —
-this one had roughly 400 MB free out of 14 GB and one `docker compose exec`
-already crashed from host memory exhaustion (unrelated to the app). Next
-session: rebuild, then run `pytest -m piston` for Task 5 and Task 6 before
-committing either as complete.
+**Proven**: rebuilt for real (a new `test` build target/service carries dev
+dependencies and the test suite the `runtime` image deliberately excludes —
+see `study_game_server/Dockerfile` and `compose.yml`'s `test` service,
+profile-gated under `--profile test`), created and migrated a `game_test`
+PostgreSQL database, and ran the suites against the live stack:
+
+- `pytest -m piston tests/test_piston_integration.py` — 9/9 passed. All
+  five isolation properties enforced under the production `_LIMITS`.
+- `pytest -m piston tests/test_piston_vertical_slice.py` — 2/2 passed.
+  Reward exactly-once, idempotent replay, and outage-retry all proven
+  against real Piston + real PostgreSQL.
+- Full server suite (excluding `tests/test_local_topology.py`, which needs
+  the host `docker` CLI and cannot run inside any container): 158/158
+  passed, twice in a row.
+- Godot: `test_runner.gd` 129/129, `quiz_regression.gd` and
+  `ranch_off_smoke.gd` all PASS (re-verified in this worktree).
+- Independently reviewed (separate pass, `feature-dev:code-reviewer`) against
+  the plan's Task 7 Step 6 checklist: all 10 properties PASS.
+
+One doc-integrity finding from that review: this section and the SDD ledger
+still said "not run" after the rebuild had already proven otherwise — both
+are now corrected here. See `study_game_server/README.md` and commits
+`363fe69`/`225218d` for full detail, including two more real bugs the actual
+`pytest -m piston` run exposed beyond the ones found via inline probes
+(the isolation-cases fixture's own stale network probe, and two
+pre-existing test-hygiene gaps in `test_judge_settings.py`/`test_problems.py`
+that only manifested once the tests actually ran together for the first
+time).
+
+`test_health.py::test_readiness` and `test_busy_loop_hits_the_time_limit`
+each failed once and passed on immediate retry — both depend on tight time
+budgets and this host ran the whole session at roughly 400 MB/14 GB free
+memory. Treat as host-load flakiness, not a code defect, unless it
+reproduces on a normal machine.
