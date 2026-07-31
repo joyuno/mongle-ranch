@@ -24,6 +24,7 @@ PackStore="*res://scripts/autoload/pack_store.gd"
 GithubSync="*res://scripts/autoload/github_sync.gd"
 ThemeSetup="*res://scripts/autoload/theme_setup.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
+GameApi="*res://scripts/autoload/game_api.gd"
 
 [display]
 
