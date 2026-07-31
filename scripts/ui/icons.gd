@@ -18,6 +18,7 @@ const MAP: Dictionary = {
 	# 네비게이션·화면
 	"home": "house",
 	"quiz": "book-open",
+	"coding": "lightbulb",
 	"gacha": "dices",
 	"collection": "library",
 	"market": "store",

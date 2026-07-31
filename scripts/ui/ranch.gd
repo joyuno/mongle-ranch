@@ -13,6 +13,7 @@ const DECOR_DIR := "res://assets/decor"
 # 의미명 / 한글 라벨 / 씬 — 네비 버튼.
 const NAV_ITEMS: Array[Dictionary] = [
 	{ "icon": "quiz", "label": "퀴즈", "scene": "res://scenes/Quiz.tscn" },
+	{ "icon": "coding", "label": "코딩", "scene": "res://scenes/CodingChallenge.tscn" },
 	{ "icon": "gacha", "label": "뽑기", "scene": "res://scenes/Gacha.tscn" },
 	{ "icon": "collection", "label": "도감", "scene": "res://scenes/Collection.tscn" },
 	{ "icon": "market", "label": "시장", "scene": "res://scenes/Market.tscn" },
