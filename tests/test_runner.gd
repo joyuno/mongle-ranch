@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_pack_filter()
 	_test_grade()
 	_test_breeding()
+	_test_api_response()
 	print("--- %d passed, %d failed ---" % [_passes, _failures])
 	quit(0 if _failures == 0 else 1)
 
@@ -412,6 +413,84 @@ func _test_pack_filter() -> void:
 	_truthy(PackFilter.matches(m_jp, "", "문법"), "매치: 검색 제목 부분일치")
 	_truthy(not PackFilter.matches(m_jp, "", "clickhouse"), "매치: 검색 불일치")
 	_truthy(PackFilter.matches({"title": "ClickHouse Basics", "tags": ["clickhouse"]}, "", "click"), "매치: 검색 대소문자 무시")
+
+
+# -----------------------------------------------------------------------------
+# ApiResponse — strict normalization of untrusted study_game_server payloads
+# -----------------------------------------------------------------------------
+func _test_api_response() -> void:
+	_section("ApiResponse")
+
+	var valid_session := { "access_token": "tok-abc", "user": { "id": "u-1", "display_name": "Guest" } }
+	var session := ApiResponse.parse_session(valid_session)
+	_truthy(session["ok"], "session: 정상 페이로드 통과")
+	_eq(session["value"]["access_token"], "tok-abc", "session: access_token 통과")
+	_eq(session["value"]["user"]["id"], "u-1", "session: user.id 통과")
+
+	_truthy(not ApiResponse.parse_session([1, 2]).get("ok", true), "session: 배열 root 거부")
+	_truthy(not ApiResponse.parse_session({"user": {"id": "u", "display_name": "g"}}).get("ok", true), "session: access_token 누락 거부")
+	_truthy(not ApiResponse.parse_session({"access_token": "t", "user": {"display_name": "g"}}).get("ok", true), "session: user.id 누락 거부")
+
+	var valid_problem := {
+		"slug": "frequency-kits", "title": "문자 키트 만들기", "stage": "practice",
+		"concepts": ["hash-map"], "language": "python",
+		"statement": "target의 문자 묶음을 만드세요.",
+		"input_format": "첫 줄 target, 둘째 줄 text", "output_format": "정수",
+		"examples": [{"input": "abc\nabccda\n", "output": "1\n"}],
+		"starter_code": "target = input()\n",
+	}
+	var problem := ApiResponse.parse_problem(valid_problem)
+	_truthy(problem["ok"], "problem: 정상 페이로드 통과")
+	_eq(problem["value"]["slug"], "frequency-kits", "problem: slug 통과")
+	_eq((problem["value"]["examples"] as Array).size(), 1, "problem: examples 통과")
+
+	var list_result := ApiResponse.parse_problem_list([valid_problem, valid_problem])
+	_truthy(list_result["ok"], "problem_list: 정상 배열 통과")
+	_eq((list_result["value"] as Array).size(), 2, "problem_list: 2건 통과")
+	_truthy(not ApiResponse.parse_problem_list([valid_problem, "nope"]).get("ok", true), "problem_list: 비-dict 항목 거부")
+	_truthy(not ApiResponse.parse_problem_list({"not": "array"}).get("ok", true), "problem_list: 비-array root 거부")
+
+	var bad_language := valid_problem.duplicate(true)
+	bad_language["language"] = "ruby"
+	_truthy(not ApiResponse.parse_problem(bad_language).get("ok", true), "problem: 미지원 language 거부")
+
+	var missing_statement := valid_problem.duplicate(true)
+	missing_statement.erase("statement")
+	_truthy(not ApiResponse.parse_problem(missing_statement).get("ok", true), "problem: statement 누락 거부")
+
+	var oversized_starter := valid_problem.duplicate(true)
+	oversized_starter["starter_code"] = "x".repeat(ApiResponse.MAX_STARTER_CODE + 1)
+	_truthy(not ApiResponse.parse_problem(oversized_starter).get("ok", true), "problem: starter_code 초과 거부")
+
+	var valid_submission := {
+		"submission_id": "sub-1", "verdict": "accepted",
+		"passed_count": 6, "total_count": 6, "runtime_ms": 42, "memory_kb": 8192,
+		"reward": {"granted": true, "coins": 300}, "wallet": {"coins": 300},
+	}
+	var submission := ApiResponse.parse_submission(valid_submission)
+	_truthy(submission["ok"], "submission: 정상 페이로드 통과")
+	_eq(submission["value"]["reward"]["coins"], 300, "submission: reward.coins 통과")
+	_eq(submission["value"]["wallet"]["coins"], 300, "submission: wallet.coins 통과")
+
+	var run_only := {
+		"submission_id": "sub-2", "verdict": "wrong_answer",
+		"passed_count": 1, "total_count": 2, "runtime_ms": 10, "memory_kb": 4096,
+	}
+	var run_result := ApiResponse.parse_submission(run_only)
+	_truthy(run_result["ok"], "submission: reward/wallet 없는 공개 실행 결과도 통과")
+	_truthy(not run_result["value"].has("reward"), "submission: reward 필드 없으면 추가되지 않음")
+
+	var unknown_verdict := valid_submission.duplicate(true)
+	unknown_verdict["verdict"] = "totally_fine"
+	_truthy(not ApiResponse.parse_submission(unknown_verdict).get("ok", true), "submission: 알 수 없는 verdict 거부")
+
+	var negative_reward := valid_submission.duplicate(true)
+	negative_reward["reward"] = {"granted": true, "coins": -1}
+	_truthy(not ApiResponse.parse_submission(negative_reward).get("ok", true), "submission: 음수 reward.coins 거부")
+
+	var negative_wallet := valid_submission.duplicate(true)
+	negative_wallet["wallet"] = {"coins": -5}
+	_truthy(not ApiResponse.parse_submission(negative_wallet).get("ok", true), "submission: 음수 wallet.coins 거부")
 
 
 func _section(name: String) -> void:
